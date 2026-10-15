@@ -275,7 +275,9 @@ viewBox="0 0 17206.5 4581.43"
     return { date: `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`, time: `${p(d.getHours())}h${p(d.getMinutes())}` };
   }
   // Helvetica (WinAnsi) não tem todos os caracteres
-  const ansi = s => String(s == null ? '' : s).replace(/[→]/g, '->').replace(/[  ]/g, ' ').replace(/[^\x20-\x7e -ÿ–—‘’“”•€Œœ\n]/g, '');
+  let tr = s => s, LANGPDF = 'fr';
+  const fill = (s, vars) => { let r = tr(s); for (const [k, v] of Object.entries(vars || {})) r = r.split('{' + k + '}').join(v); return r; };
+  const ansi = s => String(s == null ? '' : s).replace(/[→]/g, '->').replace(/≤/g, '<=').replace(/≥/g, '>=').replace(/[  ]/g, ' ').replace(/[^\x20-\x7e -ÿ–—‘’“”•€Œœ\n]/g, '');
 
   // ---------------------------------------------------------------- 1 ARC preenchido
   async function fillOne(tplBytes, client, p, idx, total, fonts) {
@@ -306,7 +308,7 @@ viewBox="0 0 17206.5 4581.43"
     txt('Nº CMD', client.ncde);
     txt('REF CLIENT', client.ref + (total > 1 ? `  (${idx}/${total})` : ''));
     txt('SOCIETE', client.societe);
-    txt('ADRESSE LIVRAISON', ['Adresse : ' + client.rue, 'CP / Ville : ' + client.cp + ' ' + client.ville + ' (France)', 'Tél. : ' + client.tel, client.gps ? 'GPS : ' + client.gps : ''].filter(Boolean).join('\n'), 7);
+    txt('ADRESSE LIVRAISON', [tr('Adresse') + ' : ' + client.rue, tr('CP / Ville') + ' : ' + client.cp + ' ' + client.ville + ' (France)', tr('Tél.') + ' : ' + client.tel, client.gps ? 'GPS : ' + client.gps : ''].filter(Boolean).join('\n'), 7);
     if (client.livraison === 'chantier') radio('PRIX_LIVRAISON', 'BATTANT');
     if (client.livraison === 'grue') radio('PRIX_LIVRAISON', '2');
 
@@ -315,7 +317,7 @@ viewBox="0 0 17206.5 4581.43"
       txt('1_PORTAIL_MODÈLE', P.modele, 7);
       txt('1_QT', v.qt);
       radio('1_PORTAIL_TYPE', { battant: 'BATTANT', coulissant: 'COULISSANT', autoportant: 'AUTOPORTANT' }[v.kind]);
-      combo('PORTAIL_SENS OUVERT', v.kind === 'battant' ? SENS_BAT[v.sens] : (v.sens || '').toUpperCase());
+      combo('PORTAIL_SENS OUVERT', LANGPDF === 'fr' && v.kind === 'battant' ? SENS_BAT[v.sens] : tr(v.sens || '').toUpperCase());
       txt('PORTAIL_HAUTEUR', v.H); txt('PORTAIL_LARGEUR', v.L);
       radio('1_TYPE_OUV', { manuel: 'BATTANT', motorisable: '3', motorise: '4' }[P.ouv]);
       radio('1_COFFRE_COLONNE', P.coffreColonne);
@@ -336,7 +338,7 @@ viewBox="0 0 17206.5 4581.43"
       txt('3_PORTILLON_MODÈLE', P.modele, 7);
       txt('3_PORTILLON_QT', v.qt);
       txt('3_PORTILLON HAUTEUR', v.H); txt('3_PORTILLON LARGEUR', v.L);
-      combo('3_PORTILLON_SENS OUVERT', SENS_BAT[v.sens]);
+      combo('3_PORTILLON_SENS OUVERT', LANGPDF === 'fr' ? SENS_BAT[v.sens] : tr(v.sens || '').toUpperCase());
       chk('3_FERME-PORTE', P.fermePorte); chk('3_GACHE ELECT', P.gache);
       radio('3_POTEAUX', P.portillonPot);
       if (P.ventouse) { chk('3_VENTOUSE', true); txt('3_QT_VENTOUSE_PORTILLON', P.ventouse); }
@@ -361,7 +363,7 @@ viewBox="0 0 17206.5 4581.43"
     radio('5_MAILLE_BARREAUX', A.mailleBarreaux); radio('5_MAILLE_DIMENS', A.mailleDim);
     radio('5_CACHE-VUE', A.cacheVue);
     chk('5_ROUL_BILLES', A.roulBilles); chk('5_TRAVERSE_INT', A.traverse);
-    txt('Observations', [p.obs, 'Détails complémentaires : voir la page suivante.'].filter(Boolean).join('\n'), 8);
+    txt('Observations', [p.obs, tr('Détails complémentaires : voir la page suivante.')].filter(Boolean).join('\n'), 8);
 
     form.updateFieldAppearances(font);
 
@@ -375,7 +377,7 @@ viewBox="0 0 17206.5 4581.43"
     for (const z of grey) {
       const [x0, y0, x1, y1] = ZONES[z];
       page.drawRectangle({ x: x0 + 1, y: PAGE_H - y1 + 1, width: x1 - x0 - 2, height: y1 - y0 - 2, color: rgb(0.93, 0.93, 0.93), opacity: 0.88 });
-      const label = 'NON CONCERNÉ';
+      const label = ansi(tr('NON CONCERNÉ'));
       const w = bold.widthOfTextAtSize(label, 11);
       page.drawText(label, { x: (x0 + x1) / 2 - w / 2, y: PAGE_H - (y0 + y1) / 2 - 4, size: 11, font: bold, color: rgb(0.55, 0.55, 0.55) });
       // esconde os campos dessa zona
@@ -400,8 +402,8 @@ viewBox="0 0 17206.5 4581.43"
     } else {
       page.drawText('!', { x: x0 + 8, y: y0 + 4, size: 10, font: bold, color: col });
     }
-    page.drawText(ok ? 'COMPLET – PRÊT À ENVOYER' : 'COMPLET – POINTS À ÉTUDIER', { x: x0 + 20, y: y0 + 4.5, size: 8.5, font: bold, color: col });
-    page.drawText(`rempli en ligne le ${t.date} à ${t.time}` + (total > 1 ? `  ·  produit ${idx}/${total}` : ''), { x: x0 + 170, y: y0 + 4.7, size: 6.5, font, color: col });
+    page.drawText(ansi(tr(ok ? 'COMPLET – PRÊT À ENVOYER' : 'COMPLET – POINTS À ÉTUDIER')), { x: x0 + 20, y: y0 + 4.5, size: 8.5, font: bold, color: col });
+    page.drawText(ansi(fill('rempli en ligne le {d} à {h}', { d: t.date, h: t.time }) + (total > 1 ? '  ·  ' + fill('produit {i}/{n}', { i: idx, n: total }) : '')), { x: x0 + 170, y: y0 + 4.7, size: 6.5, font, color: col });
 
     // renomear campos (P1_, P2_...) para poderem coexistir no PDF final
     for (const f of form.getFields()) f.acroField.dict.set(PDFName.of('T'), PDFHexString.fromText(`P${idx}_` + f.getName()));
@@ -426,11 +428,11 @@ viewBox="0 0 17206.5 4581.43"
         page.drawText(l, { x: M + (indent || 0), y, size, font: f, color: color || rgb(0.15, 0.15, 0.15) }); y -= size + 4;
       }
     };
-    line(`Détails complémentaires – produit ${idx}/${total}`, 15, bold, rgb(0.51, 0.13, 0.38));
+    line(fill('Détails complémentaires – produit {i}/{n}', { i: idx, n: total }), 15, bold, rgb(0.51, 0.13, 0.38));
     line(`${client.societe} · Réf. ${client.ref} · ${p.title}`, 10, font, rgb(0.35, 0.35, 0.35));
     y -= 6;
     if (p.warnings && p.warnings.length) {
-      line('Points à étudier par Ferplay (hors standard du configurateur) :', 10.5, bold, rgb(0.80, 0.42, 0.0));
+      line(tr('Points à étudier par Ferplay (hors standard du configurateur) :'), 10.5, bold, rgb(0.80, 0.42, 0.0));
       for (const wn of p.warnings) line('• ' + wn, 10, font, rgb(0.55, 0.30, 0.0), 8);
       y -= 6;
     }
@@ -449,11 +451,13 @@ viewBox="0 0 17206.5 4581.43"
       }
       y -= 8;
     }
-    if (p.obs) { line('Observations du client', 11.5, bold, rgb(0.51, 0.13, 0.38)); line(p.obs, 10, font); }
+    if (p.obs) { line(tr('Observations du client'), 11.5, bold, rgb(0.51, 0.13, 0.38)); line(p.obs, 10, font); }
   }
 
   // ---------------------------------------------------------------- PDF do material
-  async function buildMaterialPdf(tplBytes, client, products, attachments) {
+  // opts: { tr: função de tradução (francês -> língua da página), lang: 'fr' | 'pt' | 'en' }
+  async function buildMaterialPdf(tplBytes, client, products, attachments, opts) {
+    tr = (opts && opts.tr) || (s => s); LANGPDF = (opts && opts.lang) || 'fr';
     const out = await PDFDocument.create();
     const fonts = { font: await out.embedFont(StandardFonts.Helvetica), bold: await out.embedFont(StandardFonts.HelveticaBold) };
     const outForm = out.getForm();
@@ -749,6 +753,20 @@ const I18N_SRC = {
   'Sur platines à visser': ['Em placas aparafusadas', 'On bolt-down base plates'],
   'Kidland N°1': ['Kidland N°1', 'Kidland No. 1'], 'Kidland N°2': ['Kidland N°2', 'Kidland No. 2'],
   'Aluminium – sur mesure': ['Alumínio – à medida', 'Aluminium – made to measure'], 'Aluminium – gamme standard': ['Alumínio – gama standard', 'Aluminium – standard range'],
+  // textos do PDF
+  'Adresse': ['Morada', 'Address'], 'CP / Ville': ['CP / Cidade', 'Postcode / City'], 'Tél.': ['Tel.', 'Tel.'],
+  'Détails complémentaires : voir la page suivante.': ['Detalhes complementares: ver a página seguinte.', 'Additional details: see next page.'],
+  'NON CONCERNÉ': ['NÃO APLICÁVEL', 'NOT APPLICABLE'],
+  'COMPLET – PRÊT À ENVOYER': ['COMPLETO – PRONTO A ENVIAR', 'COMPLETE – READY TO SEND'],
+  'COMPLET – POINTS À ÉTUDIER': ['COMPLETO – PONTOS A ANALISAR', 'COMPLETE – POINTS TO REVIEW'],
+  'rempli en ligne le {d} à {h}': ['preenchido online em {d} às {h}', 'filled in online on {d} at {h}'],
+  'produit {i}/{n}': ['produto {i}/{n}', 'product {i}/{n}'],
+  'Détails complémentaires – produit {i}/{n}': ['Detalhes complementares – produto {i}/{n}', 'Additional details – product {i}/{n}'],
+  'Points à étudier par Ferplay (hors standard du configurateur) :': ['Pontos a analisar pela Ferplay (fora do standard do configurador):', 'Points to be reviewed by Ferplay (outside the configurator standard):'],
+  'Observations du client': ['Observações do cliente', 'Customer notes'],
+  'Pièces jointes (envoyées avec cette fiche)': ['Anexos (enviados com esta ficha)', 'Attachments (sent with this sheet)'],
+  'Fichier {n}': ['Ficheiro {n}', 'File {n}'],
+  '(catalogue 2026, hors configurateur)': ['(catálogo 2026, fora do configurador)', '(2026 catalogue, not in the configurator)'],
 };
 const OPEN_DAY = { pt: ['à', 'a', 'ouvertures/jour', 'aberturas/dia'], en: ['à', 'to', 'ouvertures/jour', 'openings/day'] };
 let LANG = 'fr';
@@ -948,32 +966,30 @@ function validateProduct(m, v) {
 }
 
 // ======================= produto -> PDF e detalhes =======================
-function productPdf(p) {
-  const saved = LANG; LANG = 'fr';
-  try { return productPdfFr(p); } finally { LANG = saved; }
-}
+// ficha na língua escolhida na página (o modelo do ARC tem os títulos impressos em francês)
+function productPdf(p) { return productPdfIn(p); }
 function uiTitle(p) {
   const m = CAT[p.code], v = p.v;
   const dims = v.L && v.H ? ` – ${fmt(v.L)} × ${fmt(v.H)}` : (v.H ? ` – H ${fmt(v.H)}` : '');
   return `${t(KIND_SHORT[m.kind])} ${m.label}${dims}`;
 }
-function productPdfFr(p) {
+function productPdfIn(p) {
   const m = CAT[p.code], v = p.v, F = fieldsFor(m, v);
   const shown = F.filter(f => f.type !== 'info');
   const label = (f, val) => {
     if (val === undefined || val === null || val === '' || val === false) return '';
-    if (f.type === 'check') return val ? 'Oui' : '';
-    if (f.type === 'qty') return Object.entries(val || {}).filter(([, q]) => Number(q) > 0).map(([n, q]) => `${n} × ${q}`).join(' ; ');
-    if (f.opts) { const o = f.opts.map(optVal).find(x => String(x[0]) === String(val)); return o ? String(o[1]) : String(val); }
+    if (f.type === 'check') return val ? t('Oui') : '';
+    if (f.type === 'qty') return Object.entries(val || {}).filter(([, q]) => Number(q) > 0).map(([n, q]) => `${t(n)} × ${q}`).join(' ; ');
+    if (f.opts) { const o = f.opts.map(optVal).find(x => String(x[0]) === String(val)); return o ? t(String(o[1])) : t(String(val)); }
     return f.unit ? `${fmt(val)} ${f.unit}` : String(val);
   };
   const secs = {};
-  secs['Produit'] = [['Gamme', m.gamme === 'sm' ? 'Industriel sur mesure' : 'Industriel standard'], ['Produit', KIND_LABEL[m.kind]], ['Modèle', m.catalogueOnly ? `${m.label} (catalogue 2026, hors configurateur)` : `${m.label} (${m.code})`]];
+  secs[t('Produit')] = [[t('Gamme'), t(m.gamme === 'sm' ? 'Industriel sur mesure' : 'Industriel standard')], [t('Produit'), t(KIND_LABEL[m.kind])], [t('Modèle'), m.catalogueOnly ? `${m.label} ${t('(catalogue 2026, hors configurateur)')}` : `${m.label} (${m.code})`]];
   for (const f of shown) {
     if (f.k === 'obs') continue;
-    const val = v[f.k]; const t = label(f, val);
-    if (!t) continue;
-    (secs[f.sec] = secs[f.sec] || []).push([f.label, t]);
+    const val = v[f.k]; const txtv = label(f, val);
+    if (!txtv) continue;
+    (secs[t(f.sec)] = secs[t(f.sec)] || []).push([t(f.label), txtv]);
   }
   const details = Object.entries(secs).map(([title, rows]) => ({ title, rows }));
   const { warnings } = validateProduct(m, v);
@@ -1028,8 +1044,8 @@ function productPdfFr(p) {
   P.accUsed = Object.keys(P.acc).length > 0;
   const dims = v.L && v.H ? ` – ${fmt(v.L)} × ${fmt(v.H)}` : (v.H ? ` – H ${fmt(v.H)}` : '');
   return {
-    title: `${KIND_SHORT[m.kind]} ${m.label}${dims}`,
-    status: warnings.length ? 'orange' : 'green', warnings: warnings.map(w => w.msg),
+    title: `${t(KIND_SHORT[m.kind])} ${m.label}${dims}`,
+    status: warnings.length ? 'orange' : 'green', warnings: warnings.map(w => w.ui),
     v: { kind: m.kind, qt: v.qt, L: m.kind === 'cloture' && m.gamme === 'st' ? '' : v.L, H: v.H, sens: v.sens },
     pdf: P, details, obs: v.obs || ''
   };
@@ -1282,8 +1298,8 @@ async function generate(mat, btn) {
   try {
     const c = readClient();
     const ps = S.products.filter(p => material(p) === mat).map(productPdf);
-    if (files.length) ps.forEach(p => { p.details = [...p.details, { title: 'Pièces jointes (envoyées avec cette fiche)', rows: files.map((f, i) => [`Fichier ${i + 1}`, f.name]) }]; });
-    const bytes = await ArcPdf.buildMaterialPdf(b64ToBytes(ARC_PDF_B64), c, ps, []);
+    if (files.length) ps.forEach(p => { p.details = [...p.details, { title: t('Pièces jointes (envoyées avec cette fiche)'), rows: files.map((f, i) => [tf('Fichier {n}', { n: i + 1 }), f.name]) }]; });
+    const bytes = await ArcPdf.buildMaterialPdf(b64ToBytes(ARC_PDF_B64), c, ps, [], { tr: t, lang: LANG });
     const name = `Fiche-Industriel-${mat.startsWith('alu') ? 'Alu' : 'Fer'}${mat.endsWith('-std') ? '-Standard' : ''}_${safe(c.societe)}_${safe(c.ref)}.pdf`;
     generated[mat] = { blob: new Blob([bytes], { type: 'application/pdf' }), name, snap: snapshot() };
     renderSend();
