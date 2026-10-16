@@ -1585,6 +1585,12 @@ const I18N_SRC = {
   'Digicode radio': ['Código digital via rádio', 'Radio keypad'], 'Interphone vidéo filaire': ['Videoporteiro com fio', 'Wired video intercom'], 'Pilotage radio par GSM avec horloge': ['Comando via rádio por GSM com relógio', 'GSM radio control with timer'], 'Récepteur radio': ['Recetor de rádio', 'Radio receiver'],
   'Poteau de guidage': ['Poste de guia', 'Guide post'],
   'Dénivelé par mètre linéaire (%)': ['Desnível por metro linear (%)', 'Slope per linear metre (%)'],
+  // respostas do Gonçalo (16/10/2026)
+  'Moteur Ferplay : jusqu’à 8 000 mm de largeur.': ['Motor Ferplay: até 8 000 mm de largura.', 'Ferplay motor: up to 8,000 mm wide.'],
+  'Type de motorisation': ['Tipo de motorização', 'Motorisation type'], 'Non réversible': ['Não reversível', 'Non-reversible'], 'Réversible': ['Reversível', 'Reversible'],
+  'Vitesse de fonctionnement': ['Velocidade de funcionamento', 'Operating speed'], '6 mètres/min': ['6 metros/min', '6 metres/min'], '9 mètres/min': ['9 metros/min', '9 metres/min'], '12 mètres/min': ['12 metros/min', '12 metres/min'],
+  'Peu intensif': ['Pouco intensivo', 'Light use'],
+  '{label} : valeur non valable (5 chiffres maximum)': ['{label}: valor inválido (máximo 5 algarismos)', '{label}: invalid value (5 digits maximum)'],
 };
 const OPEN_DAY = { pt: ['à', 'a', 'ouvertures/jour', 'aberturas/dia'], en: ['à', 'to', 'ouvertures/jour', 'openings/day'] };
 let LANG = 'fr';
@@ -1638,7 +1644,9 @@ let generated = {};     // material -> { blob, name, snap }
 
 // ======================= regras do produto =======================
 const POSES_CLI = ['Moteur posé au sol', 'Mini caisson', 'Coffret technique', 'Colonne technique'];
-function montageOptions(src, pose) {
+function montageOptions(src, pose, tree) {
+  // Collectif autoportant com motor Ferplay: só sans / avec prémontage (também na colonne technique)
+  if (tree === 'COAU' && src === 'ferplay' && pose !== 'Moteur posé au sol') return ['Sans prémontage', 'Avec prémontage'];
   if (pose === 'Moteur posé au sol') return ['Sans prémontage', 'Avec prémontage'];
   if (pose === 'Mini caisson' || pose === 'Coffret technique') return src === 'client' ? ['Sans prémontage', 'Avec prémontage et câblage'] : ['Sans prémontage', 'Avec prémontage', 'Avec prémontage et câblage'];
   return [];
@@ -1655,6 +1663,9 @@ function applicationOptions(tree, L) {
     case 'C150': return [act + ' (100 à 200 ouvertures/jour)', lourd + ' (50 à 100 ouvertures/jour)'];
     case 'C200': return L > 10000 ? [lourd + ' (50 à 100 ouvertures/jour)'] : [act + ' (100 à 200 ouvertures/jour)', lourd + ' (50 à 100 ouvertures/jour)'];
     case '2V': return ['Semi intensif', 'Intensif'];
+    case 'CO2V': return ['Peu intensif', 'Intensif'];
+    case 'COAU': return ['Peu intensif', 'Semi intensif'];
+    case 'COCO': return ['Semi intensif', 'Intensif'];
   }
   return [];
 }
@@ -1687,7 +1698,7 @@ function fieldsFor(m, v) {
     } else {
       add({ k: 'qt', sec: 'Dimensions', label: 'Nombre de panneaux', type: 'number', req: true, min: 1, max: 999, hard: true });
       add({ k: 'H', sec: 'Dimensions', label: 'Hauteur', type: 'number', unit: 'mm', req: true, min: m.H[0], max: m.H[m.H.length - 1], soft: true });
-      add({ k: 'L', sec: 'Dimensions', label: 'Longueur totale de la clôture', type: 'number', unit: 'mm', req: true, min: 100, max: 999999, hard: true });
+      add({ k: 'L', sec: 'Dimensions', label: 'Longueur totale de la clôture', type: 'number', unit: 'mm', req: true, min: 100, max: 99999, hard: true });
     }
   } else {
     const LL = m.kind === 'battant' || m.kind === 'portillon' ? 'Largeur entre piliers' : 'Largeur de passage';
@@ -1735,21 +1746,26 @@ function fieldsFor(m, v) {
     add({ k: 'crem', sec: 'Motorisation', label: 'Crémaillère', type: 'radio', opts: cremOptions(m, v), req: true });
   }
   if (portail && ouv === 'motorise' && m.arbre) {
-    add({ k: 'm_src', sec: 'Motorisation', label: 'Le moteur est', type: 'radio', opts: [['client', 'Fourni par le client'], ['ferplay', 'Fourni par Ferplay']], req: true });
+    const coL = /^CO/.test(m.arbre) && Number(v.L) > 8000;   // Collectif: kit moteur Ferplay só até 8 000 mm
+    add({ k: 'm_src', sec: 'Motorisation', label: 'Le moteur est', type: 'radio', opts: [['client', 'Fourni par le client'], ['ferplay', 'Fourni par Ferplay', coL]], req: true, hint: /^CO/.test(m.arbre) ? t('Moteur Ferplay : jusqu’à 8 000 mm de largeur.') : '' });
     if (v.m_src) {
       const t = m.arbre;
-      if (t !== '2V') {
+      if (!/2V$/.test(t)) {
         const poses = v.m_src === 'ferplay' && (t === 'A120' || t === 'A160') ? [...POSES_CLI, 'Plug & play'] : POSES_CLI;
         add({ k: 'm_pose', sec: 'Motorisation', label: 'Pose du moteur', type: 'radio', opts: poses, req: true });
       }
-      const pose = t === '2V' ? 'Moteur posé au sol' : v.m_pose;
+      const pose = /2V$/.test(t) ? 'Moteur posé au sol' : v.m_pose;
       if (pose) {
-        const mo = montageOptions(v.m_src, pose);
+        const mo = montageOptions(v.m_src, pose, t);
         if (mo.length) add({ k: 'm_montage', sec: 'Motorisation', label: 'Montage', type: 'radio', opts: mo, req: true });
         if (v.m_src === 'ferplay' && pose !== 'Plug & play') add({ k: 'm_app', sec: 'Motorisation', label: 'Application', type: 'radio', opts: applicationOptions(t, v.L), req: true });
+        if (v.m_src === 'ferplay' && /^CO/.test(t)) {
+          add({ k: 'm_type', sec: 'Motorisation', label: 'Type de motorisation', type: 'radio', opts: ['Non réversible', 'Réversible'], req: true });
+          if (t !== 'CO2V' && v.m_type === 'Réversible') add({ k: 'm_vit', sec: 'Motorisation', label: 'Vitesse de fonctionnement', type: 'radio', opts: ['6 mètres/min', '9 mètres/min', '12 mètres/min'], req: true });
+        }
         add({ k: 'm_certif', sec: 'Motorisation', label: 'Dossier de certification', type: 'radio', opts: ['Oui', 'Non'], req: true });
         if (v.m_src === 'ferplay') {
-          const ec = t === '2V' ? ["Pas d'obstacle côté refoulement", 'Obstacle ou mur à moins de 500 mm (portail ouvert) côté refoulement, d’un seul côté', 'Obstacle ou mur à moins de 500 mm (portail ouvert) côté refoulement, des deux côtés'] : ["Pas d'obstacle côté refoulement", 'Obstacle ou mur à moins de 500 mm (portail ouvert) côté refoulement'];
+          const ec = /2V$/.test(t) ? ["Pas d'obstacle côté refoulement", 'Obstacle ou mur à moins de 500 mm (portail ouvert) côté refoulement, d’un seul côté', 'Obstacle ou mur à moins de 500 mm (portail ouvert) côté refoulement, des deux côtés'] : ["Pas d'obstacle côté refoulement", 'Obstacle ou mur à moins de 500 mm (portail ouvert) côté refoulement'];
           add({ k: 'm_ecras', sec: 'Motorisation', label: "Écrasement en fin d'ouverture", type: 'radio', opts: ec, req: true });
           add({ k: 'm_acc', sec: 'Motorisation', label: 'Accessoires de motorisation (quantités)', type: 'qty', items: ACC_MOTEUR });
         }
@@ -1926,7 +1942,7 @@ function fieldsHab(m, v) {
       if ((o.tableau || []).some(e => e.T === 'Chiffre')) add({ k: 'o' + o.id, sec: 'Options – décors', label: lab + ' (chiffres)', type: 'text', wide: true });
       const items = habTabItems(o);
       if (items.length) add({ k: 'o' + o.id, sec: 'Options – décors', label: lab + ' (quantités)', type: 'qty', items });
-    } else if (o.choix && o.choix.length) add({ k: 'o' + o.id, sec: 'Options', label: o.titre || lab, type: 'select', opts: [['', 'Aucun'], ...o.choix], wide: true });
+    } else if (o.choix && o.choix.length) add({ k: 'o' + o.id, sec: 'Options', label: o.titre || lab, type: 'select', opts: [['', 'Aucun'], ...o.choix.map(c => [c, c, !!(o.horizA && v.forme && v.forme !== 'A' && /horizont/i.test(c))])], wide: true });
     else add({ k: 'o' + o.id, sec: 'Options', label: lab, type: 'check' });
   }
   // poteaux (opção «Poteau de fixation à sceller»)
@@ -2166,6 +2182,8 @@ function validateProduct(m, v) {
     if (empty) continue;
     if (f.type === 'number') {
       const n = Number(val);
+      // nunca valores absurdos: no máximo 5 algarismos (99 999) e nunca negativos
+      if (Number.isFinite(n) && (Math.abs(n) > 99999 || n < 0)) { const ui = tf('{label} : valeur non valable (5 chiffres maximum)', { label: t(f.label) }); errors.push({ k: f.k, msg: f.label + ' : valeur non valable (5 chiffres maximum)', ui, short: ui }); continue; }
       if (!Number.isFinite(n) || (!f.dec && !Number.isInteger(n))) { const ui = tf('{label} : nombre entier', { label: t(f.label) }); errors.push({ k: f.k, msg: f.label + ' : nombre entier', ui, short: ui }); continue; }
       if (n < f.min || n > f.max) {
         const vars = { label: t(f.label), n: fmt(n), min: fmt(f.min), max: fmt(f.max) };
@@ -2361,7 +2379,7 @@ function renderEditor() {
       const lab = f.label ? `<span class="lab ${f.req ? 'req' : ''}">${esc(t(f.label))}</span>` : '';
       if (f.type === 'radio') h += lab + radio('f_' + f.k, f.opts, val);
       else if (f.type === 'select') h += `<label class="${f.req ? 'req' : ''}" for="f_${f.k}">${esc(t(f.label))}</label><select id="f_${f.k}" name="f_${f.k}">${f.req ? '<option value=""></option>' : ''}${f.opts.map(o => { const [ov, ol, dis] = optVal(o); return `<option value="${esc(ov)}" ${String(val) === String(ov) ? 'selected' : ''} ${dis ? 'disabled' : ''}>${esc(t(ol))}${dis ? ' ' + t('(non disponible)') : ''}</option>`; }).join('')}</select>`;
-      else if (f.type === 'number') h += `<label class="${f.req ? 'req' : ''}" for="f_${f.k}">${esc(t(f.label))}</label><div class="unit"><input type="number" id="f_${f.k}" name="f_${f.k}" ${f.dec ? 'step="0.1" inputmode="decimal"' : 'inputmode="numeric"'} value="${esc(val == null ? '' : val)}">${f.unit ? `<em>${f.unit}</em>` : ''}</div>${f.soft ? `<span class="hint">${esc(tf('Gamme du configurateur : {min} à {max} mm. Au-delà : à étudier par Ferplay.', { min: fmt(f.min), max: fmt(f.max) }))}</span>` : ''}`;
+      else if (f.type === 'number') h += `<label class="${f.req ? 'req' : ''}" for="f_${f.k}">${esc(t(f.label))}</label><div class="unit"><input type="number" id="f_${f.k}" name="f_${f.k}" min="0" max="99999" oninput="if (this.value.replace(/\D/g, '').length > 5) this.value = this.value.slice(0, this.value.length - 1)" ${f.dec ? 'step="0.1" inputmode="decimal"' : 'inputmode="numeric"'} value="${esc(val == null ? '' : val)}">${f.unit ? `<em>${f.unit}</em>` : ''}</div>${f.soft ? `<span class="hint">${esc(tf('Gamme du configurateur : {min} à {max} mm. Au-delà : à étudier par Ferplay.', { min: fmt(f.min), max: fmt(f.max) }))}</span>` : ''}`;
       else if (f.type === 'text') h += `<label class="${f.req ? 'req' : ''}" for="f_${f.k}">${esc(t(f.label))}</label><input type="text" id="f_${f.k}" name="f_${f.k}" value="${esc(val || '')}">`;
       else if (f.type === 'textarea') h += `<label for="f_${f.k}">${esc(t(f.label))}</label><textarea id="f_${f.k}" name="f_${f.k}">${esc(val || '')}</textarea>`;
       else if (f.type === 'check') h += `<label class="ck"><input type="checkbox" name="f_${f.k}" ${val ? 'checked' : ''}><span>${esc(t(f.label))}</span></label>`;
