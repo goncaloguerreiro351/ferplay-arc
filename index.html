@@ -2881,6 +2881,7 @@ document.querySelectorAll('.lang button').forEach(b => b.onclick = () => setLang
 
 // ======================= arranque =======================
 if (!PROD) $('protoBanner').hidden = false;
+$('btnExemple').hidden = !INTERNE;   // o exemplo de preenchimento só existe na versão interna / de teste; o cliente não o vê
 if (INTERNE) {
   // versão interna: morada num só campo; contacto e e-mail facultativos
   for (const k of ['rue', 'cp', 'ville', 'pays']) document.querySelector(`#secClient [data-c="${k}"]`).hidden = true;
@@ -2897,7 +2898,7 @@ if (draft && ((draft.products && draft.products.length) || (draft.client && draf
 let lang0 = 'fr'; try { lang0 = localStorage.getItem('ferplay-lang') || 'fr'; } catch (e) { }
 setLang(lang0);
 // demonstração para testes (só na versão de teste): #demo abre o exemplo com o 1.º produto em edição
-if (!PROD && location.hash.startsWith('#demo')) { exemple(); startEdit(Number(location.hash.slice(5)) || 0); if (location.hash.endsWith('x')) gotoMissing(); }
+if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdit(Number(location.hash.slice(5)) || 0); if (location.hash.endsWith('x')) gotoMissing(); }
 </script>
 </body>
 </html>
