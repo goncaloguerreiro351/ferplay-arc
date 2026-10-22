@@ -2286,7 +2286,6 @@ function fieldsLdg(m, v) {
       add({ k: 'portSens', sec: 'Portillon piscine', label: 'Ouverture (vers l’extérieur)', type: 'radio', opts: ['À gauche', 'À droite'], req: true }); }
   }
   if (d.acc && v.mc) add({ k: 'acc', sec: 'Accessoires pour main courante (quantités)', label: 'Accessoires', type: 'qty', items: LDG_ACC[v.mc].map(x => x[1]) });
-  add({ k: 'photosInfo', sec: 'Photos et plan', type: 'info', text: t('Impératif : joignez les photos et le plan avec mesures (rubrique « Pièces jointes »). Sans ces éléments la commande ne sera pas traitée.') });
   add({ k: 'obs', sec: 'Observations', label: 'Observations pour ce produit (demandes particulières, modifications…)', type: 'textarea' });
   return F;
 }
@@ -2327,7 +2326,6 @@ function validateProduct(m, v) {
       else if (o && o[2]) { const ui = tf('{label} : combinaison non disponible', { label: t(f.label) }); errors.push({ k: f.k, msg: f.label + ' : combinaison non disponible', ui, short: ui }); }
     }
   }
-  if (m.ldg && !files.length) errors.push({ k: 'photosInfo', msg: 'Photos et plan obligatoires', ui: t('Photos et plan obligatoires (pièces jointes)'), short: t('Photos et plan obligatoires (pièces jointes)') });
   if (m.hab && m.rec.dims && m.rec.dims.modo === 'surface' && Number(v.L) && Number(v.H)) {
     const d = m.rec.dims, S = Number(v.L) * Number(v.H) / 1e6, vars = { s: S.toFixed(2).replace('.', ','), a: d.smin, b: d.smax };
     if (S > d.smax) warnings.push({ k: 'H', msg: `Surface ${vars.s} m² au-delà de ${d.smax} m² : à étudier par Ferplay`, ui: tf('Surface {s} m² au-delà de {b} m² : à étudier par Ferplay', vars) });
