@@ -357,7 +357,7 @@ viewBox="0 0 17206.5 4581.43"
     }
     return bs >= 0.5 ? best : null;
   }
-  const HFIXRE = [[/gond avec cache/i, /^GONDS (HAUTS )?AVEC CACHE(-GONDS)? \(STANDARD\)|^GONDS AVEC CACHE/], [/3 points.*cache/i, /GONDS 3 POINTS A VISSER AVEC CACHE|^GONDS HAUTS AVEC CACHE-GONDS$/],
+  const HFIXRE = [[/obturateur/i, /^GOND OBTURATEUR/], [/gond avec cache/i, /^GONDS (HAUTS )?AVEC CACHE(-GONDS)? \(STANDARD\)|^GONDS AVEC CACHE/], [/3 points.*cache/i, /GONDS 3 POINTS A VISSER AVEC CACHE|^GONDS HAUTS AVEC CACHE-GONDS$/],
     [/3 points/i, /^GONDS 3 POINTS A VISSER HAUT ET BAS/], [/multir.glage/i, /GONDS (BAS )?MULTIREGLAGE/], [/sceller/i, /^GONDS A SCELLER/], [/crapaudine/i, /^CRAPAUDINE/], [/paumelle/i, /MONTAGE SUR PAUMELLES/]];
   // poses do Chiffreur: 7 e 8 = «Standard : 90° entre piliers» com pivots (Saphir, Yères…)
   const HPOSERE = { 1: /^90/, 2: /^180. ARRIERE/, 3: /^180. ENTRE/, 4: /^OUVERTURE VERS L/, 5: /^OUVERTURE SUR PENTE/, 6: /^90/, 7: /^90/, 8: /^90/ };
@@ -392,7 +392,7 @@ viewBox="0 0 17206.5 4581.43"
     if (P.surMesure) {
       obs.unshift(tr('Modèle') + ' : ' + P.modele);
       if (P.forme) obs.push(tr('Forme') + ' : ' + P.forme);
-      if (P.poseTitre) obs.push(tr('Type de pose') + ' : ' + P.poseTitre + (P.fixTitre ? ' – ' + P.fixTitre : '') + (P.deniv ? ' (' + String(P.deniv).replace('.', ',') + ' %)' : ''));
+      if (P.poseTitre) obs.push(tr('Type de pose') + ' : ' + P.poseTitre + (P.fixTitre ? ' – ' + P.fixTitre + (P.fixTitre2 ? ' + ' + P.fixTitre2 : '') : '') + (P.deniv ? ' (' + String(P.deniv).replace('.', ',') + ' %)' : ''));
       if (P.sens && kind !== 'coulissant') obs.push(tr("Sens d'ouverture (vue extérieure)") + ' : ' + P.sens);
       if (P.kitLabel) obs.push(tr('Kit moteur') + ' : ' + P.kitLabel);
     }
@@ -683,7 +683,7 @@ viewBox="0 0 17206.5 4581.43"
     if (S && !box(S, { tail: true })) obs.push(tr("Sens d'ouverture") + ' : ' + v.sens);
     // pose e fixação
     if (P.pose) { if (!box(HPOSERE[P.pose]) && P.poseTitre) obs.push(tr('Type de pose') + ' : ' + P.poseTitre); if (P.pose == 5 && P.deniv) tx(/DENIVELE PAR ML\)$/, String(P.deniv).replace('.', ',')); if (P.pose == 6) box(/^GONDS A SCELLER/); }
-    if (P.fixTitre) { const r = HFIXRE.find(([a]) => a.test(P.fixTitre)); if (!(r && box(r[1]))) obs.push(tr('Fixation') + ' : ' + P.fixTitre); }
+    for (const ft of [P.fixTitre, P.fixTitre2].filter(Boolean)) { const r = HFIXRE.find(([a]) => a.test(ft)); if (!(r && box(r[1]))) obs.push(tr('Fixation') + ' : ' + ft); }   // Standard + gond avec cache marca as duas
     // abertura
     if (P.ouv === 'manuelle') { box(/^SERRURE ET POIGNEE/); if (P.arret) { box(/^(2 )?ARRETS? AVEC BLOCAGE/); box(/visser/i.test(P.arret) ? /^A VISSER/ : /^A SCELLER/, { row: /ARRETS? AVEC BLOCAGE/ }); } }
     if (P.ouv === 'motorisée' || P.ouv === 'motorisable') {
@@ -961,21 +961,17 @@ viewBox="0 0 17206.5 4581.43"
       }
     }
 
-    // selo
+    // selo (22/10/2026): só um tick verde pequeno com «Completo» (ou «!» laranja com «A estudar»), no canto superior esquerdo, sem tocar em nada
     const ok = p.status !== 'orange';
     const col = ok ? rgb(0.10, 0.50, 0.27) : rgb(0.80, 0.42, 0.0);
-    const bg = ok ? rgb(0.89, 0.96, 0.91) : rgb(1, 0.94, 0.86);
-    // carimbo mais curto nos ARCs Habitat (o título da gama começa a x≈315)
-    const x0 = 28, y0 = PAGE_H - 21, w = P.tpl ? 282 : 330, h = 15;
-    page.drawRectangle({ x: x0, y: y0, width: w, height: h, color: bg, borderColor: col, borderWidth: 1 });
+    const x0 = 28, y0 = PAGE_H - 15;
     if (ok) {
-      page.drawLine({ start: { x: x0 + 6, y: y0 + 7.5 }, end: { x: x0 + 9, y: y0 + 4 }, thickness: 1.6, color: col });
-      page.drawLine({ start: { x: x0 + 9, y: y0 + 4 }, end: { x: x0 + 15, y: y0 + 11 }, thickness: 1.6, color: col });
+      page.drawLine({ start: { x: x0, y: y0 + 3.5 }, end: { x: x0 + 2.6, y: y0 + 0.8 }, thickness: 1.3, color: col });
+      page.drawLine({ start: { x: x0 + 2.6, y: y0 + 0.8 }, end: { x: x0 + 7.6, y: y0 + 6.4 }, thickness: 1.3, color: col });
     } else {
-      page.drawText('!', { x: x0 + 8, y: y0 + 4, size: 10, font: bold, color: col });
+      page.drawText('!', { x: x0 + 2.5, y: y0 + 0.5, size: 8.5, font: bold, color: col });
     }
-    page.drawText(ansi(tr(ok ? 'COMPLET – PRÊT À ENVOYER' : 'COMPLET – POINTS À ÉTUDIER')), { x: x0 + 20, y: y0 + 4.5, size: 8.5, font: bold, color: col });
-    page.drawText(ansi(fill('rempli en ligne le {d} à {h}', { d: t.date, h: t.time }) + (total > 1 && !P.tpl ? '  ·  ' + fill('produit {i}/{n}', { i: idx, n: total }) : '')), { x: x0 + 160, y: y0 + 4.7, size: P.tpl ? 5.8 : 6.5, font, color: col });
+    page.drawText(ansi(tr(ok ? 'COMPLET' : 'À ÉTUDIER')), { x: x0 + 11, y: y0 + 1.2, size: 6.8, font: bold, color: col });
 
     // renomear campos (P1_, P2_...) para poderem coexistir no PDF final
     for (const f of form.getFields()) f.acroField.dict.set(PDFName.of('T'), PDFHexString.fromText(`P${idx}_` + f.getName()));
@@ -1042,7 +1038,7 @@ viewBox="0 0 17206.5 4581.43"
   // campos que a Ferplay pode preencher depois (prazo, preço, data de receção, observações)
   const FERPLAY_EDIT = /_(DELAI1?|PRIX NET|DATE_RECEPTION|DATE_RENVOI|Observations|Nº CMD)$/;
   // versão interna: a data de receção já vem preenchida e fica fechada
-  const FERPLAY_EDIT_INT = /_(DELAI1?|PRIX NET|DATE_RENVOI|Observations|Nº CMD)$/;
+  const FERPLAY_EDIT_INT = FERPLAY_EDIT;
   function fieldValue(f) {
     const c = f.constructor.name;
     try {
@@ -1137,6 +1133,15 @@ const I18N_SRC = {
   'Adresse de livraison complète': ['Morada de entrega completa', 'Full delivery address'],
   'Collez l’adresse telle quelle (plusieurs lignes possibles).': ['Cole a morada tal como está (pode ter várias linhas).', 'Paste the address as it is (several lines allowed).'],
   'Version interne Ferplay': ['Versão interna Ferplay', 'Ferplay internal version'],
+  'COMPLET': ['COMPLETO', 'COMPLETE'],
+  'À ÉTUDIER': ['A ESTUDAR', 'TO REVIEW'],
+  'Gond obturateur de jour (pour portail plein)': ['Gond obturador de dia (para portão cheio)', 'Daylight-closing hinge (for solid gate)'],
+  'Ajouter aussi : Gond avec cache (Standard + gond avec cache)': ['Juntar também: Gond avec cache (Standard + gond avec cache)', 'Also add: Gond avec cache (Standard + gond avec cache)'],
+  'Ajouter aussi : Standard, gonds multiréglage à visser haut et bas (Standard + gond avec cache)': ['Juntar também: Standard, gonds multiréglage à visser haut et bas (Standard + gond avec cache)', 'Also add: Standard, multi-adjustable hinges to screw top and bottom (Standard + gond avec cache)'],
+  'Hauteurs calculées : H1 (pilier) {h1} mm · H2 {h2} mm': ['Alturas calculadas: H1 (pilar) {h1} mm · H2 {h2} mm', 'Calculated heights: H1 (pillar) {h1} mm · H2 {h2} mm'],
+  ' · H3 {h3} mm': [' · H3 {h3} mm', ' · H3 {h3} mm'],
+  'H3 : choisissez d’abord la forme': ['H3: escolha primeiro a forma', 'H3: choose the shape first'],
+  'H1 et H2 : choisissez d’abord la forme et la largeur.': ['H1 e H2: escolha primeiro a forma e a largura.', 'H1 and H2: choose the shape and the width first.'],
   'À définir': ['A definir', 'To be defined'],
   'à définir': ['a definir', 'to be defined'],
   'variante à définir': ['variante a definir', 'variant to be defined'],
@@ -1964,7 +1969,44 @@ function habFinitions(m, coul) {
   if (fin.some(f => /mat/i.test(f)) && (mask & 2)) out.push(['MAT', 'Mat']);
   return out;
 }
-const habPose = (m, v) => (HABR(m.rec.poses) || []).find(p => String(p.id) === String(v.pose));
+// 22/10/2026: Fluviale e Pierres Gemmes (battant e portillon) têm mais uma fixation na pose standard: «Gond obturateur de jour»
+const _habPoses = {};
+function habPoses(m) {
+  const base = HABR(m.rec.poses) || [];
+  if (!/^HAALCO(FL|PG)/.test(m.rcode) || !['battant', 'portillon'].includes(m.kind)) return base;
+  if (!_habPoses[m.code]) _habPoses[m.code] = base.map(p => String(p.id) === '1' ? { ...p, fixations: [...p.fixations, { id: 20, titre: 'Gond obturateur de jour (pour portail plein)', H4: 100 }] } : p);
+  return _habPoses[m.code];
+}
+const habPose = (m, v) => habPoses(m).find(p => String(p.id) === String(v.pose));
+
+// Regras entre H1, H2 e H3 no alumínio (Gonçalo, 22/10/2026), só battants e portillons. x = H2; H1 = x + 100 (é a altura do pilar).
+// Battant: H3 = x + 150 se a largura de passagem for ≤ 3 500 mm, x + 200 se for maior (City: 250 / 350). Portillon: H3 depende da forma.
+// Régionale sur mesure: sem H3. As formas A (direita) não têm H3.
+const HAB_H_RULE = { HAALCOVI: {}, HAALCOFL: {}, HAALCOPG: {}, HAALTRTC: { city: true }, HAALCORS: { h3: false } };
+function habHRule(m) {
+  if (m.famille !== 'alu-habitat' || !['battant', 'portillon'].includes(m.kind)) return null;
+  const k = Object.keys(HAB_H_RULE).find(p => String(m.rcode).startsWith(p));
+  return k ? { pre: k, ...HAB_H_RULE[k] } : null;
+}
+// diferença H3 − H2: número; null = esta forma não tem H3; undefined = ainda não se sabe (falta a forma)
+function habH3Delta(m, v, rule) {
+  if (rule.h3 === false) return null;
+  if (v.forme === 'A') return null;
+  if (m.kind === 'battant') { const L = Number(v.L); if (!L) return undefined; return rule.city ? (L <= 3500 ? 250 : 350) : (L <= 3500 ? 150 : 200); }
+  if (!v.forme) return undefined;
+  const T = rule.city ? { D: 100, E: 100, F: 0, G: -200 } : (rule.pre === 'HAALCOPG' ? { B: 60, C: 60, D: 60, E: 60, F: 30, G: -90 } : { B: 60, C: 60, D: 60, E: 60, F: 25, G: -95 });
+  const d = T[String(v.forme)[0]];   // DE conta como D e FG como F
+  return d === undefined ? null : d;
+}
+function habAluH(m, v, rule) {
+  const val = Number(v.hRef === 'H2' ? v.Hin2 : v.hRef === 'H3' ? v.Hin3 : v.H);
+  if (!val) return null;
+  const dl = habH3Delta(m, v, rule);
+  let x;
+  if (v.hRef === 'H1') x = val - 100; else if (v.hRef === 'H2') x = val;
+  else { if (typeof dl !== 'number') return { pendente: true }; x = val - dl; }
+  return { H1: x + 100, H2: x, H3: typeof dl === 'number' ? x + dl : null, h3Pendente: dl === undefined };
+}
 const habFix = (m, v) => { const p = habPose(m, v); return p && p.fixations.find(f => String(f.id) === String(v.fix)); };
 const habForme = (m, v) => (m.rec.formes || []).find(f => f.code === v.forme);
 const habOuv = (m, v) => (HABR(m.rec.ouverture) || []).find(o => o.mode === v.ouv);
@@ -2036,24 +2078,38 @@ function fieldsHab(m, v) {
   else if (d.H) {
     // 22/10/2026 (Gonçalo): o cliente dá a altura que tiver (H1, H2 ou H3) e só essa vai para o ARC. Sem cálculos:
     // as fórmulas entre as H (habCalc) não estão certas; a Ferplay calcula as outras à mão até termos as fórmulas corretas.
+    // Alumínio battant/portillon (5 gamas): as outras alturas calculam-se pelas regras de habHRule; nas restantes só vai a que o cliente dá.
+    const rule = habHRule(m);
     const hs = [['H1', m.kind === 'coulissant' ? 'H1 – hauteur' : 'H1 – hauteur aux piliers'], ['H2', 'H2 – hauteur au montant']];
-    if (m.kind !== 'coulissant') hs.push(['H3', 'H3 – hauteur à la flèche']);
+    if (m.kind !== 'coulissant' && !(rule && (rule.h3 === false || v.forme === 'A'))) hs.push(['H3', 'H3 – hauteur à la flèche']);
     if (!hs.some(h => h[0] === v.hRef)) v.hRef = 'H1';
     add({ k: 'hRef', sec: 'Dimensions', label: 'Hauteur connue', type: 'radio', opts: hs, req: true });
     if (v.hRef === 'H1') add({ k: 'H', sec: 'Dimensions', label: HL, type: 'number', unit: 'mm', req: true, min: d.H.min, max: d.H.max, soft: true });
     else add({ k: 'Hin' + v.hRef.slice(1), sec: 'Dimensions', label: hs.find(h => h[0] === v.hRef)[1], type: 'number', unit: 'mm', req: true, min: 100, max: 99999, hard: true });
+    if (rule) {
+      const ah = habAluH(m, v, rule);
+      if (v.hRef !== 'H1') { if (ah && !ah.pendente) v.H = String(ah.H1); else delete v.H; }
+      if (ah && !ah.pendente) add({ k: 'calcInfo', sec: 'Dimensions', type: 'info', text: tf('Hauteurs calculées : H1 (pilier) {h1} mm · H2 {h2} mm', { h1: fmt(ah.H1), h2: fmt(ah.H2) }) + (ah.H3 != null ? tf(' · H3 {h3} mm', { h3: fmt(ah.H3) }) : (ah.h3Pendente ? ' · ' + t('H3 : choisissez d’abord la forme') : '')) });
+      else if (ah && ah.pendente) add({ k: 'calcInfo', sec: 'Dimensions', type: 'info', text: t('H1 et H2 : choisissez d’abord la forme et la largeur.') });
+    }
   }
   add({ k: 'qt', sec: 'Dimensions', label: 'Quantité', type: 'number', req: true, min: 1, max: 99, hard: true });
   if (r.surMesure && /^HAALCORS(NO|PY)$/.test(m.rcode) && m.kind !== 'portillon' && Number(v.L) > 3000) add({ k: 'meneauxInfo', sec: 'Dimensions', type: 'info', text: tf('Largeur de passage {l} mm : {n} meneau(x) obligatoire(s) (lames de 1 500 mm maximum).', { l: fmt(v.L), n: Number(v.L) >= 3500 ? 2 : 1 }) });
   // forma
-  if ((r.formes || []).length) add({ k: 'forme', sec: 'Forme', label: 'Forme du portail', type: 'radio', opts: r.formes.map(f => [f.code, `${f.code} – ${f.nom}`]), req: true });
+  // City: nem os battants nem os portillons têm as formas B e C (Gonçalo, 22/10/2026)
+  const formesOk = (r.formes || []).filter(f => !(/^HAALTRTC/.test(m.rcode) && ['battant', 'portillon'].includes(m.kind) && /^[BC]$/.test(f.code)));
+  if (formesOk.length) add({ k: 'forme', sec: 'Forme', label: 'Forme du portail', type: 'radio', opts: formesOk.map(f => [f.code, `${f.code} – ${f.nom}`]), req: true });
   // pose e fixação
-  const poses = HABR(r.poses) || [];
+  const poses = habPoses(m);
   if (poses.length) {
     add({ k: 'pose', sec: 'Pose', label: 'Type de pose', type: 'radio', opts: poses.map(p => [String(p.id), p.titre, !!(r.surMesure && /pente/i.test(p.titre) && (v.ouv === 'motorisée' || v.ouv === 'motorisable'))]), req: true });
     const p = habPose(m, v);
     if (p) {
       add({ k: 'fix', sec: 'Pose', label: 'Fixation', type: 'radio', opts: p.fixations.map(f => [String(f.id), f.titre]), req: true });
+      // única fixation que se pode juntar a outra: Standard (gonds multiréglage) + Gond avec cache
+      const fS = p.fixations.find(f => String(f.id) === '1'), fC = p.fixations.find(f => String(f.id) === '15');
+      if (fS && fC && (String(v.fix) === '1' || String(v.fix) === '15')) add({ k: 'fix2', sec: 'Pose', type: 'check', label: String(v.fix) === '1' ? 'Ajouter aussi : Gond avec cache (Standard + gond avec cache)' : 'Ajouter aussi : Standard, gonds multiréglage à visser haut et bas (Standard + gond avec cache)' });
+      else delete v.fix2;
       const fx = habFix(m, v);
       if (fx && fx.saisie && fx.saisie.campo) {
         // 22/10/2026 (Ferplay, via Gonçalo): dénivelé em abertura manual 9 a 12 %, em motorizada 2 a 16 % (o Chiffreur tem os limites trocados)
@@ -2094,7 +2150,8 @@ function fieldsHab(m, v) {
   const fixes = (m.rec.optionfixe || []).map(String);
   const fixList = habOptionList(m, v).filter(o => fixes.includes(String(o.id)));
   if (fixList.length) add({ k: 'fixInfo', sec: 'Options', type: 'info', text: tf('Inclus d’office : {x}.', { x: fixList.map(o => o.nom || o.titre).join(', ') }) });
-  for (const o of habOptionList(m, v).filter(o => !fixes.includes(String(o.id)))) {
+  const totemRank = o => /totem/i.test(o.nom || o.titre || '') ? 1 : 0;   // as opções do Totem vão para o fim da lista
+  for (const o of habOptionList(m, v).filter(o => !fixes.includes(String(o.id))).sort((a, b) => totemRank(a) - totemRank(b))) {
     const lab = o.nom || o.titre;
     if (o.typeopt === 12) {
       add({ k: 'o' + o.id, sec: 'Options', label: lab, type: 'check' });
@@ -2157,7 +2214,7 @@ function fieldsHab(m, v) {
       const ks = s.replace(/\W/g, '');
       add({ k: 'pq' + ks, sec: 'Poteaux à sceller (avec gonds montés)', label: tf('Poteaux {s} – quantité', { s: s.toLowerCase() }), type: 'number', req: false, min: 0, max: 20, hard: true });
       if (Number(v['pq' + ks]) > 0) {
-        add({ k: 'ph' + ks, sec: 'Poteaux à sceller (avec gonds montés)', label: tf('Poteaux {s} – hauteur hors sol', { s: s.toLowerCase() }), type: 'select', opts: pt.hauteurs.map(h => [h, fmt(h) + ' mm']), req: true });
+        if (!habHRule(m)) add({ k: 'ph' + ks, sec: 'Poteaux à sceller (avec gonds montés)', label: tf('Poteaux {s} – hauteur hors sol', { s: s.toLowerCase() }), type: 'select', opts: pt.hauteurs.map(h => [h, fmt(h) + ' mm']), req: true });
         for (const x of (pt.optionsParSection || {})[s] || []) add({ k: 'px' + ks + x.replace(/\W/g, ''), sec: 'Poteaux à sceller (avec gonds montés)', label: `${x} (${s.toLowerCase()})`, type: 'check' });
       }
     }
@@ -2173,7 +2230,10 @@ function habPdfValues(m, v) {
   const P = { tpl: m.tpl, surMesure: !!r.surMesure, sens: v.sens, modeleNom: m.label, formeNom: (habForme(m, v) || {}).nom, modele: `${m.label} (${m.rcode})`, forme: v.forme, L: v.L, H1: v.hRef && v.hRef !== 'H1' ? null : v.H, H2: v.hRef === 'H2' ? v.Hin2 : null, H3: v.hRef === 'H3' ? v.Hin3 : null, qt: v.qt,
     ral: v.coul === '__autre' ? v.ralAutre : habColorTxt(v.coul), fin: v.fin, pose: po && po.id, poseTitre: po && po.titre, fix: fx && fx.id, fixTitre: fx && fx.titre, deniv: v.deniv,
     ouv: o && o.mode, arret: v.arret || '', opts: {}, optLabels: {}, horsArc: [] };
-  // só a altura dada pelo cliente vai para o ARC; as outras ficam em branco para a Ferplay (nota nas Observations)
+  // alumínio battant/portillon: H1, H2 e H3 pelas regras (habHRule); o pilar tem sempre a altura H1
+  const hrule = habHRule(m);
+  if (hrule) { const ah = habAluH(m, v, hrule); if (ah && !ah.pendente) { P.H1 = ah.H1; P.H2 = ah.H2; P.H3 = ah.H3; } }
+  // nos outros casos só a altura dada pelo cliente vai para o ARC; as outras ficam em branco para a Ferplay (nota nas Observations)
   if (v.hRef === 'H2' && v.Hin2) P.horsArc.push(t('Hauteur donnée par le client') + ' : H2 = ' + fmt(v.Hin2) + ' mm');
   if (v.hRef === 'H3' && v.Hin3) P.horsArc.push(t('Hauteur donnée par le client') + ' : H3 = ' + fmt(v.Hin3) + ' mm');
   const descr = ((HABR(r.descriptif) || {}).L || []).join(' ');
@@ -2189,6 +2249,7 @@ function habPdfValues(m, v) {
   }
   for (const id of r.optionfixe || []) { const op = (HABR(r.options) || []).find(o => String(o.id) === String(id)); if (op && (!v.forme || ((HABR(r.optionsParForme) || {})[v.forme] || []).map(String).includes(String(id)))) { P.opts[id] = true; P.optLabels[id] = op.nom || op.titre; } }
   P.potMode = v.potMode; P.potSec = v.potSec;
+  { const pp = habPose(m, v); const fS = pp && pp.fixations.find(f => String(f.id) === '1'), fC = pp && pp.fixations.find(f => String(f.id) === '15'); P.fixTitre2 = v.fix2 && fS && fC ? (String(v.fix) === '1' ? fC.titre : fS.titre) : ''; }
   P.potRecOn = !!v.potRecOn; P.potRecQt = Number(v.potRecQt) || 1; P.potRec = v.potRecOn ? v.potRec : '';
   P.potGuiOn = !!v.potGuiOn; P.potGuiQt = Number(v.potGuiQt) || 1; P.potGui = v.potGuiOn ? v.potGui : '';
   P.gache = v.gache ? v.gacheT : undefined;
@@ -2196,7 +2257,7 @@ function habPdfValues(m, v) {
   { const k = habKits(m, v).find(x => x.id === v.kit); if (k) P.kitLabel = k.label; }
   // poteaux
   const pt = HABR(r.poteaux);
-  P.poteaux = (pt && pt.sections || []).map(s => { const ks = s.replace(/\W/g, ''); return { s, qt: Number(v['pq' + ks]) || 0, h: v['ph' + ks], opts: ((pt.optionsParSection || {})[s] || []).filter(x => v['px' + ks + x.replace(/\W/g, '')]) }; }).filter(x => x.qt > 0);
+  P.poteaux = (pt && pt.sections || []).map(s => { const ks = s.replace(/\W/g, ''); return { s, qt: Number(v['pq' + ks]) || 0, h: hrule ? P.H1 : v['ph' + ks], opts: ((pt.optionsParSection || {})[s] || []).filter(x => v['px' + ks + x.replace(/\W/g, '')]) }; }).filter(x => x.qt > 0);
   // motorização (o ARC Habitat não tem campos de motor: vai para Observations e detalhes)
   const kit = habKits(m, v).find(k => k.id === v.kit);
   if (kit) { const acc = Object.entries(v.kitAcc || {}).filter(([, q]) => Number(q) > 0).map(([n, q]) => `${n} × ${q}`); P.horsArc.push(`${t('Kit moteur')} : ${kit.label}${acc.length ? ' (' + acc.join(', ') + ')' : ''}`); }
