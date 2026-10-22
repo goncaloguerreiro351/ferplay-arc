@@ -1128,8 +1128,6 @@ const I18N_SRC = {
   'H1 – hauteur aux piliers': ['H1 – altura aos pilares', 'H1 – height at pillars'],
   'H1 – hauteur': ['H1 – altura', 'H1 – height'],
   'H2 – hauteur au montant': ['H2 – altura ao montante', 'H2 – height at upright'],
-  'H1 (hauteur aux piliers) calculée : {h} mm.': ['H1 (altura aos pilares) calculada: {h} mm.', 'H1 (height at pillars) calculated: {h} mm.'],
-  'H1 provisoire : le calcul exact se fait après le choix de la forme et de la fixation.': ['H1 provisória: o cálculo exato faz-se depois de escolher a forma e a fixação.', 'Provisional H1: the exact value is calculated once the shape and fixing are chosen.'],
   'Hauteur donnée par le client': ['Altura dada pelo cliente', 'Height given by the customer'],
   'Transport par semi-remorque : vérifiez l\'accessibilité du chantier.': ['Transporte em semirreboque: verifique o acesso à obra.', 'Semi-trailer delivery: check site access.'],
   'Champ obligatoire': ['Campo obrigatório', 'Required field'],
@@ -1975,20 +1973,6 @@ function habCalc(m, v) {
   }
   return { L, H1, H4, F, H2, H3 };
 }
-// H1 a partir da altura que o cliente deu (H2 ou H3): ajusta H1 até o cálculo do configurador dar essa altura
-// (a flèche pode depender de H1, por isso itera). Sem flèche não há H3 e usa-se o valor como H2.
-function habH1From(m, v, ref, val) {
-  if (!val) return 0;
-  let H1 = val;
-  for (let i = 0; i < 8; i++) {
-    const c = habCalc(m, { ...v, H: H1 });
-    const got = ref === 'H3' ? (c.H3 != null ? c.H3 : c.H2) : c.H2;
-    if (got == null) break;
-    const d = val - got; if (Math.abs(d) < 0.5) break;
-    H1 += d;
-  }
-  return Math.round(H1);
-}
 function habOptionList(m, v) {
   // condição «Option31» do Chiffreur: opções do tipo 31 (cache vue haut) só com altura > 1000 mm
   const cond31 = (HABR(m.rec.conditions) || []).find(c => c.nom === 'Option31');
@@ -2024,25 +2008,17 @@ function fieldsHab(m, v) {
   const HL = m.kind === 'coulissant' ? 'Hauteur' : 'Hauteur des piliers (sous chapeaux) – H1';
   if (d.fixeH) add({ k: 'H', sec: 'Dimensions', label: HL, type: 'select', opts: d.H.valores.map(x => [x, fmt(x) + ' mm']), req: true });
   else if (d.H) {
-    // 22/10/2026 (Gonçalo): o cliente pode dar H1, H2 ou H3; mete-se a que tiver e calculam-se as outras
+    // 22/10/2026 (Gonçalo): o cliente dá a altura que tiver (H1, H2 ou H3) e só essa vai para o ARC. Sem cálculos:
+    // as fórmulas entre as H (habCalc) não estão certas; a Ferplay calcula as outras à mão até termos as fórmulas corretas.
     const hs = [['H1', m.kind === 'coulissant' ? 'H1 – hauteur' : 'H1 – hauteur aux piliers'], ['H2', 'H2 – hauteur au montant']];
     if (m.kind !== 'coulissant') hs.push(['H3', 'H3 – hauteur à la flèche']);
     if (!hs.some(h => h[0] === v.hRef)) v.hRef = 'H1';
     add({ k: 'hRef', sec: 'Dimensions', label: 'Hauteur connue', type: 'radio', opts: hs, req: true });
     if (v.hRef === 'H1') add({ k: 'H', sec: 'Dimensions', label: HL, type: 'number', unit: 'mm', req: true, min: d.H.min, max: d.H.max, soft: true });
-    else {
-      const kin = 'Hin' + v.hRef.slice(1);
-      add({ k: kin, sec: 'Dimensions', label: hs.find(h => h[0] === v.hRef)[1], type: 'number', unit: 'mm', req: true, min: 100, max: 99999, hard: true });
-      const H1 = habH1From(m, v, v.hRef, Number(v[kin]) || 0);
-      if (H1) v.H = String(H1); else delete v.H;
-      if (v.H) add({ k: 'H', sec: 'Dimensions', type: 'info', text: tf('H1 (hauteur aux piliers) calculée : {h} mm.', { h: fmt(v.H) }) });
-    }
+    else add({ k: 'Hin' + v.hRef.slice(1), sec: 'Dimensions', label: hs.find(h => h[0] === v.hRef)[1], type: 'number', unit: 'mm', req: true, min: 100, max: 99999, hard: true });
   }
   add({ k: 'qt', sec: 'Dimensions', label: 'Quantité', type: 'number', req: true, min: 1, max: 99, hard: true });
   if (r.surMesure && /^HAALCORS(NO|PY)$/.test(m.rcode) && m.kind !== 'portillon' && Number(v.L) > 3000) add({ k: 'meneauxInfo', sec: 'Dimensions', type: 'info', text: tf('Largeur de passage {l} mm : {n} meneau(x) obligatoire(s) (lames de 1 500 mm maximum).', { l: fmt(v.L), n: Number(v.L) >= 3500 ? 2 : 1 }) });
-  const c0 = habCalc(m, v);
-  if (c0.H2 !== null) add({ k: 'calcInfo', sec: 'Dimensions', type: 'info', text: tf('Calculé comme dans le configurateur : H2 (hors gond) = {h2} mm · flèche {f} mm · H3 (à la flèche) = {h3} mm.', { h2: fmt(c0.H2), f: fmt(c0.F), h3: fmt(c0.H3) }) });
-  else if (v.hRef && v.hRef !== 'H1' && v.H) add({ k: 'calcInfo', sec: 'Dimensions', type: 'info', text: t('H1 provisoire : le calcul exact se fait après le choix de la forme et de la fixation.') });
   // forma
   if ((r.formes || []).length) add({ k: 'forme', sec: 'Forme', label: 'Forme du portail', type: 'radio', opts: r.formes.map(f => [f.code, `${f.code} – ${f.nom}`]), req: true });
   // pose e fixação
@@ -2149,13 +2125,13 @@ function fieldsHab(m, v) {
 // valores semânticos para o ARC Habitat (arc_pdf.js decide onde marcar em cada modelo)
 function habPdfValues(m, v) {
   if (m.ldg) return ldgPdfValues(m, v);
-  const r = m.rec, c = habCalc(m, v), fx = habFix(m, v), po = habPose(m, v), o = habOuv(m, v);
-  const P = { tpl: m.tpl, surMesure: !!r.surMesure, sens: v.sens, modeleNom: m.label, formeNom: (habForme(m, v) || {}).nom, modele: `${m.label} (${m.rcode})`, forme: v.forme, L: v.L, H1: v.H, H2: c.H2, H3: c.H3, qt: v.qt,
+  const r = m.rec, fx = habFix(m, v), po = habPose(m, v), o = habOuv(m, v);
+  const P = { tpl: m.tpl, surMesure: !!r.surMesure, sens: v.sens, modeleNom: m.label, formeNom: (habForme(m, v) || {}).nom, modele: `${m.label} (${m.rcode})`, forme: v.forme, L: v.L, H1: v.hRef && v.hRef !== 'H1' ? null : v.H, H2: v.hRef === 'H2' ? v.Hin2 : null, H3: v.hRef === 'H3' ? v.Hin3 : null, qt: v.qt,
     ral: v.coul === '__autre' ? v.ralAutre : habColorTxt(v.coul), fin: v.fin, pose: po && po.id, poseTitre: po && po.titre, fix: fx && fx.id, fixTitre: fx && fx.titre, deniv: v.deniv,
     ouv: o && o.mode, arret: v.arret || '', opts: {}, optLabels: {}, horsArc: [] };
-  // a altura dada pelo cliente vai tal e qual (as outras são calculadas)
-  if (v.hRef === 'H2' && v.Hin2) { P.H2 = Number(v.Hin2); P.horsArc.push(t('Hauteur donnée par le client') + ' : H2 = ' + fmt(v.Hin2) + ' mm'); }
-  if (v.hRef === 'H3' && v.Hin3) { if (P.H3 != null) P.H3 = Number(v.Hin3); else P.H2 = Number(v.Hin3); P.horsArc.push(t('Hauteur donnée par le client') + ' : H3 = ' + fmt(v.Hin3) + ' mm'); }
+  // só a altura dada pelo cliente vai para o ARC; as outras ficam em branco para a Ferplay (nota nas Observations)
+  if (v.hRef === 'H2' && v.Hin2) P.horsArc.push(t('Hauteur donnée par le client') + ' : H2 = ' + fmt(v.Hin2) + ' mm');
+  if (v.hRef === 'H3' && v.Hin3) P.horsArc.push(t('Hauteur donnée par le client') + ' : H3 = ' + fmt(v.Hin3) + ' mm');
   const descr = ((HABR(r.descriptif) || {}).L || []).join(' ');
   const lm = descr.match(/lames?\s*(vertic|horizont)\w*\s*:?\s*(\d{3})\s*x\s*20/i);
   if (lm) { P.lames = lm[2]; P.montage = /vertic/i.test(lm[1]) ? 'V' : 'H'; }
@@ -2383,7 +2359,7 @@ function validateProduct(m, v) {
 function productPdf(p) { return productPdfIn(p); }
 function uiTitle(p) {
   const m = CAT[p.code], v = p.v;
-  const dims = v.L && v.H ? ` – ${fmt(v.L)} × ${fmt(v.H)}` : (v.H ? ` – H ${fmt(v.H)}` : '');
+  const hv = v.H || v.Hin2 || v.Hin3, dims = v.L && hv ? ` – ${fmt(v.L)} × ${fmt(hv)}` : (v.H ? ` – H ${fmt(v.H)}` : '');
   return `${t(KIND_SHORT[m.kind])} ${m.ldg ? t(m.label) : m.label}${dims}`;
 }
 function productPdfIn(p) {
@@ -2411,7 +2387,7 @@ function productPdfIn(p) {
     const P = habPdfValues(m, v);
     if (P.H2 != null) { const dm = details.find(d => d.title === t('Dimensions')); if (dm) dm.rows.push([t('H2 – hauteur au montant (hors gond)'), `${fmt(P.H2)} mm`], [t('H3 – hauteur à la flèche'), `${fmt(P.H3)} mm`]); }
     if (P.horsArc.length) details.push({ title: t('À reporter par Ferplay (pas de case dans la fiche)'), rows: P.horsArc.map(x => ['•', x]) });
-    const dims = v.L && v.H ? ` – ${fmt(v.L)} × ${fmt(v.H)}` : '';
+    const hv = v.H || v.Hin2 || v.Hin3, dims = v.L && hv ? ` – ${fmt(v.L)} × ${fmt(hv)}` : '';
     return { title: `${t(KIND_SHORT[m.kind])} ${m.ldg ? t(m.label) : m.label}${dims}`, status: warnings.length ? 'orange' : 'green', warnings: warnings.map(w => w.ui), v: { kind: m.kind, qt: v.qt, L: v.L, H: v.H, sens: v.sens }, pdf: P, details, obs: v.obs || '' };
   }
   // valores do ARC (semânticos; arc_pdf.js decide onde marcar em cada modelo rev 01.26)
@@ -2460,7 +2436,7 @@ function productPdfIn(p) {
     else if (/modulec/.test(lab)) { const tt = v['o' + o.id + 't'] || ''; A.gacheEm = /mission/i.test(tt); A.gacheRup = /rupture/i.test(tt); if (!A.gacheEm && !A.gacheRup) P.horsArc.push(full); }
     else P.horsArc.push(full);   // sem caixa no ARC rev 01.26: vai para «Observations»
   }
-  const dims = v.L && v.H ? ` – ${fmt(v.L)} × ${fmt(v.H)}` : (v.H ? ` – H ${fmt(v.H)}` : '');
+  const hv = v.H || v.Hin2 || v.Hin3, dims = v.L && hv ? ` – ${fmt(v.L)} × ${fmt(hv)}` : (v.H ? ` – H ${fmt(v.H)}` : '');
   return {
     title: `${t(KIND_SHORT[m.kind])} ${m.label}${dims}`,
     status: warnings.length ? 'orange' : 'green', warnings: warnings.map(w => w.ui),
