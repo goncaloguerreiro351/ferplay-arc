@@ -421,16 +421,44 @@ viewBox="0 0 17206.5 4581.43"
     sansSerrure: [335.5, 522.1, 9.9], renfortCrem: [335.5, 538.0, 9.9], cremNylon: [335.5, 551.1, 9.9], cremProfil: [335.5, 564.3, 9.9], rail: [335.5, 580.2, 9.9], ralHors: [335.5, 596.1, 9.9],
   };
   function fillSM(c) {
-    const { page, font, bold, client, P, v, t, idx, total, obs, addr } = c;
+    const { page, font, bold, client, P, v, t, idx, total, obs, addr, form } = c;
     const Y = yt => PAGE_H - yt, dark = rgb(0.08, 0.08, 0.10);
+    // 22/10/2026: na versão interna este ARC leva campos reais (texto e caixas), todos editáveis; na do cliente continua desenhado
+    const interne = !!client.interne && !!form;
+    const made = new Set(), boxes = {}; let nF = 0;
+    // o pdf-lib põe fundo branco e borda preta por omissão: tira-os para não tapar o que está impresso no ARC
+    const limpa = fld => { for (const w of fld.acroField.getWidgets()) { const mk = w.dict.lookup(PDFName.of('MK')); if (mk && mk.delete) { mk.delete(PDFName.of('BG')); mk.delete(PDFName.of('BC')); } } };
+    const chk = (k, on) => {
+      if (!boxes[k]) {
+        const [x, y, sz] = SM_CHK[k];
+        const cb = form.createCheckBox('SM_C_' + k);
+        cb.addToPage(page, { x, y: PAGE_H - y - sz, width: sz, height: sz, borderWidth: 0 }); limpa(cb);
+        boxes[k] = cb;
+      }
+      if (on) boxes[k].check();
+    };
     const text = (s, x, yb, size, o) => {
-      s = ansi(s == null ? '' : String(s)); if (!s) return;
+      s = ansi(s == null ? '' : String(s));
+      if (interne) {
+        const key = x + ':' + yb; if (made.has(key)) return; made.add(key);
+        let sz = size || 9; const fw = Math.max((o && o.max) || 40, 40);
+        if (s && o && o.max) while (sz > 5 && font.widthOfTextAtSize(s, sz) > o.max) sz -= 0.5;
+        const f = form.createTextField('SM_T' + (++nF));
+        f.addToPage(page, { x: o && o.right ? x - fw : (o && o.center ? x - fw / 2 : x), y: Y(yb) - sz * 0.3 - 1, width: fw, height: sz * 1.25 + 2, borderWidth: 0, font });
+        limpa(f);
+        if (s) f.setText(s);
+        f.setFontSize(sz);
+        if (o && o.right) f.setAlignment(LIB.TextAlignment.Right); else if (o && o.center) f.setAlignment(LIB.TextAlignment.Center);
+        return;
+      }
+      if (!s) return;
       let sz = size || 9; const f = (o && o.bold) ? bold : font;
       if (o && o.max) while (sz > 5 && f.widthOfTextAtSize(s, sz) > o.max) sz -= 0.5;
       const w = f.widthOfTextAtSize(s, sz);
       page.drawText(s, { x: o && o.right ? x - w : (o && o.center ? x - w / 2 : x), y: Y(yb), size: sz, font: f, color: dark });
     };
     const cross = k => {
+      if (interne) { chk(k, true); return; }
       const [x, y, s] = SM_CHK[k], a = 2.2;
       page.drawLine({ start: { x: x + a, y: Y(y + a) }, end: { x: x + s - a, y: Y(y + s - a) }, thickness: 1.4, color: dark });
       page.drawLine({ start: { x: x + s - a, y: Y(y + a) }, end: { x: x + a, y: Y(y + s - a) }, thickness: 1.4, color: dark });
@@ -440,7 +468,11 @@ viewBox="0 0 17206.5 4581.43"
     cross(client.typeDoc === 'prix' ? 'prix' : 'commande');
     text(client.societe, 72, 118, 9, { max: 175 });
     const sp = Math.min(8.4, 38 / Math.max(1, addr.length));   // até ~5 linhas entre «Adresse livraison» e «Attention livraison»
-    addr.forEach((l, i) => text(l, 32, 145 + i * sp, Math.min(7, sp * 0.85), { max: 205 }));
+    if (interne) {
+      const af = form.createTextField('SM_ADR'); af.enableMultiline();
+      af.addToPage(page, { x: 30, y: Y(187), width: 207, height: 48, borderWidth: 0, font });
+      limpa(af); af.setText(ansi(addr.join('\n'))); af.setFontSize(addr.length > 5 ? 5.5 : 7);
+    } else addr.forEach((l, i) => text(l, 32, 145 + i * sp, Math.min(7, sp * 0.85), { max: 205 }));
     text(client.ref + (total > 1 ? `  (${idx}/${total})` : ''), 308, 135, 9, { max: 255 });
     if (client.livraison === 'chantier') cross('chantier');
     if (client.livraison === 'grue') cross('chantier');   // a linha «déchargement avec grue» já vem do cabeçalho comum
@@ -489,6 +521,18 @@ viewBox="0 0 17206.5 4581.43"
         if (/platine/i.test(o)) text(p.qt, 352, i === 1 ? 739 : 723, 9);
         else obs.push(`${tr('Poteaux')} ${p.s} : ${o}`);
       }
+    }
+    if (interne) {
+      // espaços ainda vazios do ARC: passam também a campos editáveis, e todas as caixas ficam clicáveis
+      text('', 78, 45, 8, { max: 130 }); text('', 72, 118, 9, { max: 175 }); text('', 308, 135, 9, { max: 255 });
+      for (const yq of [229.5, 246, 262.5]) text('', 131, yq, 10, { center: true });
+      text('', 197, 228, 8, { max: 100 }); text('', 192, 243, 8.5, { max: 108 }); text('', 177, 257.5, 9, { max: 120 });
+      text('', 112, 287, 8, { max: 52 }); text('', 220, 287, 8, { max: 60 }); text('', 142, 305, 8, { max: 150 });
+      for (const cx of [507, 555]) for (const yy of [243, 273, 303]) text('', cx, yy, 10, { right: true });
+      text('', 418, 606, 8, { max: 150 });
+      for (const [yq, yh] of [[673, 674.4], [690, 691], [706.6, 707.6]]) { text('', 352, yq, 9); text('', 472, yh, 9, { max: 36 }); }
+      text('', 352, 723, 9); text('', 352, 739, 9);
+      for (const k of Object.keys(SM_CHK)) chk(k, false);
     }
   }
 
@@ -852,7 +896,7 @@ viewBox="0 0 17206.5 4581.43"
     const obsLines = [];
     if (client.livraison === 'chantier') markAt(H0.chantier);
     if (client.livraison === 'grue') { if (H0.grue) markAt(H0.grue); else { markAt(H0.chantier); obsLines.push(tr('Livraison sur chantier + déchargement avec grue')); } }
-    if (P.tpl === 'REGIONALE-SM') { fillSM({ page: doc.getPages()[0], font, bold, client, P, v, t, idx, total, obs: obsLines, addr });
+    if (P.tpl === 'REGIONALE-SM') { fillSM({ page: doc.getPages()[0], font, bold, client, P, v, t, idx, total, obs: obsLines, addr, form });
       if (!has('DATE_RENVOI')) form.createTextField('DATE_RENVOI').addToPage(doc.getPages()[0], { x: 104, y: PAGE_H - 88, width: 110, height: 12, borderWidth: 0, font }); }
     else if (P.tpl) fillHab(T.M, P, v, txt, markAt, form, obsLines);
     else {
