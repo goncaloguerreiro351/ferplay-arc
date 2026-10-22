@@ -388,8 +388,7 @@ viewBox="0 0 17206.5 4581.43"
     const pq = (P.poteaux || []).filter(p => /^100X100$/i.test(p.s)).reduce((a, p) => a + p.qt, 0); if (pq) txt('QT_POTEAUX', pq);
     for (const p of (P.poteaux || []).filter(p => !/^100X100$/i.test(p.s))) obs.push(`${tr('Poteaux')} ${p.s} × ${p.qt}${p.h ? ' – H ' + p.h : ''}`);
     if (P.fin === 'MAT') obs.push(tr('Finition') + ' : MAT');
-    if (P.potRec) obs.push(tr('Poteau de réception') + ' : ' + P.potRec + (P.potSec ? ' ' + P.potSec : ''));
-    if (P.potGui) obs.push(tr('Poteau de guidage') + ' : ' + P.potGui + (P.potSec ? ' ' + P.potSec : ''));
+    potLines(P).forEach(l => obs.push(l));
     if (P.surMesure) {
       obs.unshift(tr('Modèle') + ' : ' + P.modele);
       if (P.forme) obs.push(tr('Forme') + ' : ' + P.forme);
@@ -401,6 +400,16 @@ viewBox="0 0 17206.5 4581.43"
     for (const [id, val] of Object.entries(P.opts || {})) obs.push(((P.optLabels || {})[id] || id) + (typeof val === 'string' ? ' : ' + val : ''));
   }
 
+
+  // poteaux de réception / guidage (alumínio, coulissants): o ARC não tem quantidade nem a opção «à visser» em todos os modelos,
+  // por isso estas linhas vão sempre para as Observations
+  function potLines(P) {
+    if (!P.potMode) return [];
+    const ORI = { FRONTAL: 'Frontal', LATERAL: 'Latéral', EXTERIEUR: 'Extérieur', INTERIEUR: 'Intérieur' };
+    const sec = P.potSec ? ' ' + String(P.potSec).toLowerCase() : '', fix = ' ' + tr(P.potMode === 'visser' ? 'à visser (sur platine)' : 'à sceller');
+    const one = (on, lab, qt, ori) => on ? `${tr(lab)} : ${qt}${ori ? ' ' + tr(ORI[ori]).toLowerCase() : ''}${sec}${fix}` : '';
+    return [one(P.potRecOn, 'Poteau de réception', P.potRecQt, P.potRec), one(P.potGuiOn, 'Poteau de guidage', P.potGuiQt, P.potGui)].filter(Boolean);
+  }
 
   // Régionale sur mesure: ARC «CDE ALU REGIO SM» (página 10 do tarif 2026, sem campos). Tudo é desenhado por posição, por isso não é
   // editável; só DATE_RECEPTION, DELAI, PRIX NET, Nº CMD e Observations são campos (criados com cria_arc_regionale_sm.py).
@@ -449,6 +458,7 @@ viewBox="0 0 17206.5 4581.43"
     text(v.L, col, 243, 10, { right: true }); text(P.H1, col, 273, 10, { right: true }); text(P.H3, col, 303, 10, { right: true });
     // sentido de abertura
     if (v.sens) { if (v.kind === 'coulissant') cross(/droit/i.test(v.sens) ? 'coulD' : 'coulG'); else cross(/droit/i.test(v.sens) ? 'PD' : 'PG'); }
+    potLines(P).forEach(l => obs.push(l));
     // pose (só a standard está impressa: o resto vai para as Observations)
     if (P.poseTitre && /pente/i.test(P.poseTitre)) { cross(v.kind === 'portillon' ? 'penteT' : 'penteP'); obs.push(tr('Type de pose') + ' : ' + P.poseTitre + (P.deniv ? ' (' + String(P.deniv).replace('.', ',') + ' %)' : '')); }
     else if (P.poseTitre && !/^Standard/i.test(P.poseTitre)) obs.push(tr('Type de pose') + ' : ' + P.poseTitre);
@@ -693,12 +703,15 @@ viewBox="0 0 17206.5 4581.43"
       const other = p.opts.filter(o => !/platine/i.test(o)); if (other.length) obs.push(`${tr('Poteaux')} ${p.s} : ${other.join(', ')}`);
     }
     if (platine) { const f = M.texts.find(x => /PLATINE/i.test(x.name)); if (f) txt(f.name, platine); else box(/^PLATINE A VISSER POUR POTEAU/); }
-    if (P.potRec) { box(/^POTEAU DE RECEPTION/); box(P.potRec === 'FRONTAL' ? /^FRONTAL$/ : /^LATERAL$/); }
-    if (P.potGui) { box(/^POTEAU DE GUIDAGE/); box(P.potGui === 'EXTERIEUR' ? /^EXTERIEUR$/ : /^INTERIEUR$/, { row: /POTEAU DE GUIDAGE/ }) || box(P.potGui === 'EXTERIEUR' ? /^EXTERIEUR$/ : /^INTERIEUR$/); }
-    if (P.potSec) {
+    // a posição (frontal/lateral, exterior/interior) é facultativa: sem ela só se marca o poteau
+    if (P.potRecOn) { box(/^POTEAU DE RECEPTION/); if (P.potRec) box(P.potRec === 'FRONTAL' ? /^FRONTAL$/ : /^LATERAL$/); }
+    if (P.potGuiOn) { box(/^POTEAU DE GUIDAGE/); if (P.potGui) box(P.potGui === 'EXTERIEUR' ? /^EXTERIEUR$/ : /^INTERIEUR$/, { row: /POTEAU DE GUIDAGE/ }) || box(P.potGui === 'EXTERIEUR' ? /^EXTERIEUR$/ : /^INTERIEUR$/); }
+    potLines(P).forEach(l => obs.push(l));
+    if (P.potMode === 'visser' && P.potSec === '200X200') box(/^PLATINE A VISSER POUR POTEAU/);   // o ARC só tem esta caixa para a platine
+    if (P.potSec && P.potMode === 'sceller') {
       // secção: numa linha própria («POTEAU ALU À SCELLER») ou por baixo de cada poteau (City)
       const re = new RegExp('^' + P.potSec.toUpperCase() + '$');
-      const anchors = [P.potRec && hBox(M, /^POTEAU DE RECEPTION/), P.potGui && hBox(M, /^POTEAU DE GUIDAGE/)].filter(Boolean);
+      const anchors = [P.potRecOn && hBox(M, /^POTEAU DE RECEPTION/), P.potGuiOn && hBox(M, /^POTEAU DE GUIDAGE/)].filter(Boolean);
       const below = a => M.boxes.filter(b => re.test(NZ(b.label)) && b.y > a.y + 3 && b.y < a.y + 30).sort((p, q) => p.y - q.y)[0];
       const own = anchors.map(below).filter(Boolean);
       if (own.length) own.forEach(mark); else box(re, { row: /POTEAU (ALU )?A SCELLER/ }) || box(re);
@@ -1124,6 +1137,19 @@ const I18N_SRC = {
   'Adresse de livraison complète': ['Morada de entrega completa', 'Full delivery address'],
   'Collez l’adresse telle quelle (plusieurs lignes possibles).': ['Cole a morada tal como está (pode ter várias linhas).', 'Paste the address as it is (several lines allowed).'],
   'Version interne Ferplay': ['Versão interna Ferplay', 'Ferplay internal version'],
+  'À définir': ['A definir', 'To be defined'],
+  'à définir': ['a definir', 'to be defined'],
+  'variante à définir': ['variante a definir', 'variant to be defined'],
+  'Poteaux alu': ['Postes de alumínio', 'Aluminium posts'],
+  'Sans poteaux (sur pilier existant)': ['Sem postes (em pilar existente)', 'No posts (on existing pillar)'],
+  'Poteaux à sceller': ['Postes para chumbar', 'Posts to be set in concrete'],
+  'Poteaux à visser (sur platine)': ['Postes para aparafusar (sobre placa)', 'Posts to be bolted (on base plate)'],
+  'Section des poteaux alu': ['Secção dos postes de alumínio', 'Section of aluminium posts'],
+  '{p} – quantité': ['{p} – quantidade', '{p} – quantity'],
+  '{p} – position': ['{p} – posição', '{p} – position'],
+  'À préciser (souvent défini sur plan)': ['A indicar (muitas vezes só no desenho)', 'To be specified (often only known from the plan)'],
+  'à visser (sur platine)': ['para aparafusar (sobre placa)', 'to be bolted (on base plate)'],
+  'à sceller': ['para chumbar', 'to be set in concrete'],
   'Hauteur connue': ['Altura conhecida', 'Known height'],
   'H1 – hauteur aux piliers': ['H1 – altura aos pilares', 'H1 – height at pillars'],
   'H1 – hauteur': ['H1 – altura', 'H1 – height'],
@@ -2103,10 +2129,28 @@ function fieldsHab(m, v) {
       if ((pt.options || []).some(x => /trappe/i.test(x))) add({ k: 'potTrappe', sec, label: 'Trappe de visite', type: 'check' });
     }
   } else if (m.kind === 'coulissant' && pt && pt.sections) {
+    // 22/10/2026 (Gonçalo): nada é obrigatório até o cliente querer poteaux. 1) à sceller ou à visser (sobre platine);
+    // 2) secção; 3) dois botões, poteau de réception e de guidage, cada um com quantidade (1 por defeito) e a posição
+    // (frontal/lateral, exterior/interior) facultativa porque muitas vezes só se sabe no desenho.
     const sec = 'Poteaux de guidage et de réception';
-    add({ k: 'potRec', sec, label: 'Poteau de réception', type: 'radio', opts: [['', 'Sans (sur pilier existant)'], ['FRONTAL', 'Frontal'], ['LATERAL', 'Latéral']], req: false });
-    add({ k: 'potGui', sec, label: 'Poteau de guidage', type: 'radio', opts: [['', 'Sans (sur pilier existant)'], ['EXTERIEUR', 'Extérieur'], ['INTERIEUR', 'Intérieur']], req: false });
-    if (v.potRec || v.potGui) add({ k: 'potSec', sec, label: 'Section des poteaux alu à sceller', type: 'radio', opts: pt.sections.map(x => [x, x.toLowerCase()]), req: true });
+    add({ k: 'potMode', sec, label: 'Poteaux alu', type: 'radio', opts: [['', 'Sans poteaux (sur pilier existant)'], ['sceller', 'Poteaux à sceller'], ['visser', 'Poteaux à visser (sur platine)']], req: false });
+    if (!v.potMode) { for (const k of ['potSec', 'potRecOn', 'potRecQt', 'potRec', 'potGuiOn', 'potGuiQt', 'potGui']) delete v[k]; }
+    else {
+      // a platine só existe nos poteaux 150x150 e 200x200
+      const secs = v.potMode === 'visser' ? pt.sections.filter(x => (pt.optionsParSection[x] || []).includes('Platine')) : pt.sections;
+      if (v.potSec && !secs.includes(v.potSec)) delete v.potSec;
+      add({ k: 'potSec', sec, label: 'Section des poteaux alu', type: 'radio', opts: secs.map(x => [x, x.toLowerCase()]), req: true });
+      if (v.potSec) {
+        for (const [on, qt, ori, lab, oris] of [['potRecOn', 'potRecQt', 'potRec', 'Poteau de réception', [['FRONTAL', 'Frontal'], ['LATERAL', 'Latéral']]], ['potGuiOn', 'potGuiQt', 'potGui', 'Poteau de guidage', [['EXTERIEUR', 'Extérieur'], ['INTERIEUR', 'Intérieur']]]]) {
+          add({ k: on, sec, label: lab, type: 'check' });
+          if (v[on]) {
+            if (!v[qt]) v[qt] = '1';
+            add({ k: qt, sec, label: tf('{p} – quantité', { p: t(lab) }), type: 'number', req: true, min: 1, max: 20, hard: true });
+            add({ k: ori, sec, label: tf('{p} – position', { p: t(lab) }), type: 'radio', opts: [['', 'À préciser (souvent défini sur plan)'], ...oris], req: false });
+          } else { delete v[qt]; delete v[ori]; }
+        }
+      }
+    }
   } else if (pt && pt.sections && optIds.length && v.forme && (byF[v.forme] || []).map(String).some(x => optIds.includes(x))) {
     add({ k: 'potInfo', sec: 'Poteaux à sceller (avec gonds montés)', type: 'info', text: t('Facultatif : indiquez le nombre de poteaux souhaités par section.') });
     for (const s of pt.sections) {
@@ -2144,7 +2188,9 @@ function habPdfValues(m, v) {
     if (op.typeopt === 12) { const cc = v['o' + op.id + 'c']; P.ral2 = cc === '__autre' ? v['o' + op.id + 'r'] : habColorTxt(cc); }
   }
   for (const id of r.optionfixe || []) { const op = (HABR(r.options) || []).find(o => String(o.id) === String(id)); if (op && (!v.forme || ((HABR(r.optionsParForme) || {})[v.forme] || []).map(String).includes(String(id)))) { P.opts[id] = true; P.optLabels[id] = op.nom || op.titre; } }
-  P.potRec = v.potRec; P.potGui = v.potGui; P.potSec = v.potSec;
+  P.potMode = v.potMode; P.potSec = v.potSec;
+  P.potRecOn = !!v.potRecOn; P.potRecQt = Number(v.potRecQt) || 1; P.potRec = v.potRecOn ? v.potRec : '';
+  P.potGuiOn = !!v.potGuiOn; P.potGuiQt = Number(v.potGuiQt) || 1; P.potGui = v.potGuiOn ? v.potGui : '';
   P.gache = v.gache ? v.gacheT : undefined;
   P.trait = v.trait; P.potS = v.potS; P.potG = v.potG; P.potR = v.potR; P.potH = v.potH; P.potFix = v.potFix; P.potTrappe = !!v.potTrappe;
   { const k = habKits(m, v).find(x => x.id === v.kit); if (k) P.kitLabel = k.label; }
@@ -2359,6 +2405,7 @@ function validateProduct(m, v) {
 function productPdf(p) { return productPdfIn(p); }
 function uiTitle(p) {
   const m = CAT[p.code], v = p.v;
+  if (p.indef) { const d = v.L && v.H ? ` – ${fmt(v.L)} × ${fmt(v.H)}` : (v.H ? ` – H ${fmt(v.H)}` : ''); return `${t(KIND_SHORT[m.kind])} ${m.hab ? t(m.ldg ? m.groupeNom : m.groupeNom || m.label) : t('Modèle')} (${t('variante à définir')})${d}`; }
   const hv = v.H || v.Hin2 || v.Hin3, dims = v.L && hv ? ` – ${fmt(v.L)} × ${fmt(hv)}` : (v.H ? ` – H ${fmt(v.H)}` : '');
   return `${t(KIND_SHORT[m.kind])} ${m.ldg ? t(m.label) : m.label}${dims}`;
 }
@@ -2388,7 +2435,8 @@ function productPdfIn(p) {
     if (P.H2 != null) { const dm = details.find(d => d.title === t('Dimensions')); if (dm) dm.rows.push([t('H2 – hauteur au montant (hors gond)'), `${fmt(P.H2)} mm`], [t('H3 – hauteur à la flèche'), `${fmt(P.H3)} mm`]); }
     if (P.horsArc.length) details.push({ title: t('À reporter par Ferplay (pas de case dans la fiche)'), rows: P.horsArc.map(x => ['•', x]) });
     const hv = v.H || v.Hin2 || v.Hin3, dims = v.L && hv ? ` – ${fmt(v.L)} × ${fmt(hv)}` : '';
-    return { title: `${t(KIND_SHORT[m.kind])} ${m.ldg ? t(m.label) : m.label}${dims}`, status: warnings.length ? 'orange' : 'green', warnings: warnings.map(w => w.ui), v: { kind: m.kind, qt: v.qt, L: v.L, H: v.H, sens: v.sens }, pdf: P, details, obs: v.obs || '' };
+    if (p.indef) { P.modele = `${m.groupeNom || m.label} – ${t('variante à définir')}`; P.modeleNom = P.modele; delete P.lames; delete P.montage; }   // a variante-base só serve para as regras: nada do que vem do nome dela vai para o ARC
+    return { title: p.indef ? uiTitle(p) : `${t(KIND_SHORT[m.kind])} ${m.ldg ? t(m.label) : m.label}${dims}`, status: warnings.length ? 'orange' : 'green', warnings: warnings.map(w => w.ui), v: { kind: m.kind, qt: v.qt, L: v.L, H: v.H, sens: v.sens }, pdf: P, details, obs: v.obs || '' };
   }
   // valores do ARC (semânticos; arc_pdf.js decide onde marcar em cada modelo rev 01.26)
   const P = { modele: m.catalogueOnly ? `${m.label} (catalogue 2026)` : `${m.label} (${m.code})`, acc: {}, horsArc: [] };
@@ -2437,8 +2485,9 @@ function productPdfIn(p) {
     else P.horsArc.push(full);   // sem caixa no ARC rev 01.26: vai para «Observations»
   }
   const hv = v.H || v.Hin2 || v.Hin3, dims = v.L && hv ? ` – ${fmt(v.L)} × ${fmt(hv)}` : (v.H ? ` – H ${fmt(v.H)}` : '');
+  if (p.indef) P.modele = `${t('Modèle')} ${t('à définir')} (${t(m.gamme === 'co' ? 'Collectif' : m.gamme === 'sm' ? 'Industriel sur mesure' : 'Industriel standard')})`;
   return {
-    title: `${t(KIND_SHORT[m.kind])} ${m.label}${dims}`,
+    title: p.indef ? `${t(KIND_SHORT[m.kind])} ${t('Modèle')} ${t('à définir')}${dims}` : `${t(KIND_SHORT[m.kind])} ${m.label}${dims}`,
     status: warnings.length ? 'orange' : 'green', warnings: warnings.map(w => w.ui),
     v: { kind: m.kind, qt: v.qt, L: m.kind === 'cloture' && m.gamme === 'st' ? '' : v.L, H: v.H, sens: v.sens },
     pdf: P, details, obs: v.obs || ''
@@ -2516,7 +2565,9 @@ function renderEditor() {
       if (grp.length === 1) { if (v.groupe !== grp[0][0]) { v.groupe = grp[0][0]; editing.auto = true; } }
       else h += `<div class="f"><label class="req" for="e_groupe">${t('Modèle')}</label><select id="e_groupe" name="e_groupe"><option value=""></option>${grp.map(([g, n]) => `<option value="${esc(g)}" ${v.groupe === g ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>`;
       const vars = ofK.filter(x => x.groupe === v.groupe).sort((a, b) => a.label.localeCompare(b.label, 'fr', { numeric: true }));
-      if (v.groupe && vars.length > 1) h += `<div class="f"><label class="req" for="e_code">${t('Variante')}</label><select id="e_code" name="e_code"><option value=""></option>${vars.map(m => `<option value="${m.code}" ${v.code === m.code ? 'selected' : ''}>${esc(m.label)}</option>`).join('')}</select></div>`;
+      // versão interna (22/10/2026): a variante não é obrigatória; fica «À définir» e valem as regras da 1.ª variante da lista
+      if (INTERNE && v.groupe && vars.length > 1 && !v.code) { v.indef = true; v.code = vars[0].code; }
+      if (v.groupe && vars.length > 1) h += `<div class="f"><label class="${INTERNE ? '' : 'req'}" for="e_code">${t('Variante')}</label><select id="e_code" name="e_code"><option value="">${INTERNE ? t('À définir') : ''}</option>${vars.map(m => `<option value="${m.code}" ${(!v.indef || !INTERNE) && v.code === m.code ? 'selected' : ''}>${esc(m.label)}</option>`).join('')}</select></div>`;
       else if (v.groupe && vars.length === 1 && v.code !== vars[0].code) { v.code = vars[0].code; }
     }
   }
@@ -2552,7 +2603,7 @@ function renderEditor() {
       const lab = f.label ? `<span class="lab ${f.req ? 'req' : ''}">${esc(t(f.label))}</span>` : '';
       if (f.type === 'radio') h += lab + radio('f_' + f.k, f.opts, val);
       else if (f.type === 'select') h += `<label class="${f.req ? 'req' : ''}" for="f_${f.k}">${esc(t(f.label))}</label><select id="f_${f.k}" name="f_${f.k}">${f.req || f.autoOk ? '<option value=""></option>' : ''}${f.opts.map(o => { const [ov, ol, dis] = optVal(o); return `<option value="${esc(ov)}" ${String(val) === String(ov) ? 'selected' : ''} ${dis ? 'disabled' : ''}>${esc(t(ol))}${dis ? ' ' + t('(non disponible)') : ''}</option>`; }).join('')}</select>`;
-      else if (f.type === 'number') h += `<label class="${f.req ? 'req' : ''}" for="f_${f.k}">${esc(t(f.label))}</label><div class="unit"><input type="number" id="f_${f.k}" name="f_${f.k}" min="${f.k === 'qt' ? f.min || 1 : 0}" max="99999" oninput="if (this.value.replace(/\D/g, '').length > 5) this.value = this.value.slice(0, this.value.length - 1)" ${f.dec ? 'step="0.1" inputmode="decimal"' : 'inputmode="numeric"'} value="${esc(val == null ? '' : val)}">${f.unit ? `<em>${f.unit}</em>` : ''}</div>${f.soft ? `<span class="hint">${esc(tf('Gamme du configurateur : {min} à {max} mm. Au-delà : à étudier par Ferplay.', { min: fmt(f.min), max: fmt(f.max) }))}</span>` : ''}`;
+      else if (f.type === 'number') h += `<label class="${f.req ? 'req' : ''}" for="f_${f.k}">${esc(t(f.label))}</label><div class="unit"><input type="number" id="f_${f.k}" name="f_${f.k}" min="${f.k === 'qt' || /^pot(Rec|Gui)Qt$/.test(f.k) ? f.min || 1 : 0}" max="99999" oninput="if (this.value.replace(/\D/g, '').length > 5) this.value = this.value.slice(0, this.value.length - 1)" ${f.dec ? 'step="0.1" inputmode="decimal"' : 'inputmode="numeric"'} value="${esc(val == null ? '' : val)}">${f.unit ? `<em>${f.unit}</em>` : ''}</div>${f.soft ? `<span class="hint">${esc(tf('Gamme du configurateur : {min} à {max} mm. Au-delà : à étudier par Ferplay.', { min: fmt(f.min), max: fmt(f.max) }))}</span>` : ''}`;
       else if (f.type === 'text') h += `<label class="${f.req ? 'req' : ''}" for="f_${f.k}">${esc(t(f.label))}</label><input type="text" id="f_${f.k}" name="f_${f.k}" value="${esc(val || '')}">`;
       else if (f.type === 'textarea') h += `<label for="f_${f.k}">${esc(t(f.label))}</label><textarea id="f_${f.k}" name="f_${f.k}">${esc(val || '')}</textarea>`;
       else if (f.type === 'check') h += `<label class="ck"><input type="checkbox" name="f_${f.k}" ${val ? 'checked' : ''}><span>${esc(t(f.label))}</span></label>`;
@@ -2583,6 +2634,8 @@ function editorChange(e) {
   if (n.startsWith('e_')) {
     const k = n.slice(2);
     v[k] = t.value;
+    v.indef = false;   // «À définir» só se mantém quando se volta a escolher o vazio na variante (ver o ramo abaixo)
+    if (k === 'code' && t.value === '' && INTERNE) v.indef = true;
     // mudar uma escolha de topo limpa as seguintes e as respostas do produto
     const order = ['mat', 'fiche', 'gamme', 'kind', 'groupe', 'code'];
     for (const x of order.slice(order.indexOf(k) + 1)) delete v[x];
@@ -2650,7 +2703,7 @@ function updateEditorStatusOnly() {
 }
 function startEdit(index) {
   if (index < 0) editing = { index: -1, v: { mat: 'fer', fiche: 'industriel', f: {} }, touched: false };
-  else { const p = S.products[index], cm = CAT[p.code]; editing = { index, v: { mat: p.mat, fiche: p.fiche, gamme: cm.gamme, kind: cm.kind, groupe: cm.groupe, code: p.code, f: JSON.parse(JSON.stringify(p.v)) }, touched: false }; }
+  else { const p = S.products[index], cm = CAT[p.code]; editing = { index, v: { mat: p.mat, fiche: p.fiche, gamme: cm.gamme, kind: cm.kind, groupe: cm.groupe, code: p.code, indef: !!p.indef, f: JSON.parse(JSON.stringify(p.v)) }, touched: false }; }
   renderAll(); save();
   $('secEditor').scrollIntoView({ block: 'start' });
 }
@@ -2660,6 +2713,7 @@ $('btnSave').onclick = () => {
   const { errors } = validateProduct(m, editing.v.f || {});
   if (!m || errors.length) { renderEditor(); if (errors.length) focusField(errors[0].k); else $('secEditor').scrollIntoView({ block: 'start' }); return; }
   const p = { mat: editing.v.mat, fiche: editing.v.fiche, code: editing.v.code, v: editing.v.f };
+  if (editing.v.indef && INTERNE) p.indef = true;
   if (editing.index < 0) S.products.push(p); else S.products[editing.index] = p;
   editing = null; renderAll(); save();
   $('secProducts').scrollIntoView({ block: 'start' });
