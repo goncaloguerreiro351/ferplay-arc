@@ -279,7 +279,7 @@ viewBox="0 0 17206.5 4581.43"
         type2v: [85, 256], manuel: [84, 273], motorisable: [152, 272], motorise: [227, 272], pattes: [84, 304],
         galvaSans: [84, 320], galvaTherm: [84, 337], sendz: [84, 353], sable: [84, 369], couleur: [84, 401],
         PD: [407, 237], PG: [487, 238], TD: [407, 253], TG: [487, 253],
-        serrNon: [387, 298], serrOui: [469, 298], gondsV: [388, 338], gondsS: [469, 338], releveur: [387, 352], pivV: [388, 365], pivS: [469, 365],
+        gacheEm: [387, 323], gacheRup: [469, 323], serrNon: [387, 298], serrOui: [469, 298], gondsV: [388, 338], gondsS: [469, 338], releveur: [387, 352], pivV: [388, 365], pivS: [469, 365],
         ventClas: [387, 400], verrou: [387, 416], douchette: [388, 432],
         fourniF: [42, 441], fourniC: [169, 441], certif: [41, 476],
         potSoutien: [307, 469], potRecep: [308, 485], potV: [324, 501], potS: [405, 501], trappes: [481, 501],
@@ -312,7 +312,7 @@ viewBox="0 0 17206.5 4581.43"
       box: {
         PD: [407, 237], PG: [486, 238], TD: [407, 254], TG: [486, 253], manuel: [84, 256],
         galvaSans: [84, 304], galvaTherm: [84, 321], sendz: [84, 337], sable: [84, 353], couleur: [84, 385],
-        serrNon: [387, 296], serrOui: [469, 296], gondsV: [388, 336], gondsS: [469, 336], releveur: [387, 350], pivV: [388, 363], pivS: [469, 363],
+        gacheEm: [388, 323], gacheRup: [469, 323], serrNon: [387, 296], serrOui: [469, 296], gondsV: [388, 336], gondsS: [469, 336], releveur: [387, 350], pivV: [388, 363], pivS: [469, 363],
         ventClas: [387, 400], douchette: [387, 416],
         traverse: [41, 468], potSoutien: [307, 453], potRecep: [307, 469], potV: [324, 485], potS: [405, 485], trappes: [481, 485],
         m200pli: [41, 499], sansBarr: [130, 499], avecBarr: [209, 499], m200sans: [41, 514], m50: [130, 514], m20: [209, 514],
@@ -399,6 +399,87 @@ viewBox="0 0 17206.5 4581.43"
     for (const [id, val] of Object.entries(P.opts || {})) obs.push(((P.optLabels || {})[id] || id) + (typeof val === 'string' ? ' : ' + val : ''));
   }
 
+
+  // Régionale sur mesure: ARC «CDE ALU REGIO SM» (página 10 do tarif 2026, sem campos). Tudo é desenhado por posição, por isso não é
+  // editável; só DATE_RECEPTION, DELAI, PRIX NET, Nº CMD e Observations são campos (criados com cria_arc_regionale_sm.py).
+  // Coordenadas em pontos a partir do canto superior esquerdo da página.
+  const SM_CHK = {
+    prix: [265.4, 100.2, 11.3], commande: [395.2, 100.2, 11.3], chantier: [114.7, 191.1, 9.9], PD: [33.8, 359.6, 9.9], PG: [33.8, 390.5, 9.9], coulD: [332.4, 357.8, 9.9], coulG: [332.4, 446.3, 9.9],
+    tierce: [33.8, 521.5, 9.9], plan: [33.8, 536.3, 9.9], gache: [33.8, 551.1, 9.9], profilGache: [33.8, 565.9, 9.9], serrureElec: [33.8, 580.7, 9.9], paumPortail: [33.8, 595.5, 9.9], paumPortillon: [33.8, 610.3, 9.9],
+    paumDeport: [33.8, 625.1, 9.9], renfortEnterre: [33.8, 639.9, 9.9], penteP: [33.8, 654.7, 9.9], penteT: [33.8, 669.4, 9.9], contrevent: [33.8, 684.2, 9.9], arret: [33.8, 699.0, 9.9], butee: [33.8, 713.8, 9.9], socle: [33.8, 728.6, 9.9],
+    sansSerrure: [335.5, 522.1, 9.9], renfortCrem: [335.5, 538.0, 9.9], cremNylon: [335.5, 551.1, 9.9], cremProfil: [335.5, 564.3, 9.9], rail: [335.5, 580.2, 9.9], ralHors: [335.5, 596.1, 9.9],
+  };
+  function fillSM(c) {
+    const { page, font, bold, client, P, v, t, idx, total, obs } = c;
+    const Y = yt => PAGE_H - yt, dark = rgb(0.08, 0.08, 0.10);
+    const text = (s, x, yb, size, o) => {
+      s = ansi(s == null ? '' : String(s)); if (!s) return;
+      let sz = size || 9; const f = (o && o.bold) ? bold : font;
+      if (o && o.max) while (sz > 5 && f.widthOfTextAtSize(s, sz) > o.max) sz -= 0.5;
+      const w = f.widthOfTextAtSize(s, sz);
+      page.drawText(s, { x: o && o.right ? x - w : (o && o.center ? x - w / 2 : x), y: Y(yb), size: sz, font: f, color: dark });
+    };
+    const cross = k => {
+      const [x, y, s] = SM_CHK[k], a = 2.2;
+      page.drawLine({ start: { x: x + a, y: Y(y + a) }, end: { x: x + s - a, y: Y(y + s - a) }, thickness: 1.4, color: dark });
+      page.drawLine({ start: { x: x + s - a, y: Y(y + a) }, end: { x: x + a, y: Y(y + s - a) }, thickness: 1.4, color: dark });
+    };
+    // cabeçalho
+    text(client.contactNom, 78, 45, 8, { max: 130 });
+    text(t.date, 93, 86.5, 9);
+    cross(client.typeDoc === 'prix' ? 'prix' : 'commande');
+    text(client.societe, 72, 118, 9, { max: 175 });
+    [tr('Adresse') + ' : ' + client.rue, tr('CP / Ville') + ' : ' + client.cp + ' ' + client.ville + ' (France)', tr('Tél.') + ' : ' + client.tel, client.gps ? 'GPS : ' + client.gps : ''].filter(Boolean)
+      .forEach((l, i) => text(l, 32, 141 + i * 8.4, 7, { max: 205 }));
+    text(client.ref + (total > 1 ? `  (${idx}/${total})` : ''), 308, 135, 9, { max: 255 });
+    if (client.livraison === 'chantier') cross('chantier');
+    if (client.livraison === 'grue') { cross('chantier'); obs.push(tr('Livraison sur chantier + déchargement avec grue')); }
+    // quantidade, modelo, forma, cor
+    text(v.qt, 131, { battant: 229.5, coulissant: 246, portillon: 262.5 }[v.kind] || 229.5, 10, { center: true });
+    text(P.modeleNom, 197, 228, 8, { max: 100 });
+    text([P.forme, P.formeNom].filter(Boolean).join(' – '), 192, 243, 8.5, { max: 108 });
+    text(P.ral, 177, 257.5, 9, { max: 120 });
+    // Provence: décor, número e posição
+    const O = P.opts || {}, L = P.optLabels || {}, done = new Set();
+    if (O.DM) { text(String(O.DM).replace(/^Motif\s*/i, ''), 112, 287, 8, { max: 52 }); done.add('DM'); }
+    if (O.DP) { const [nb, pos] = String(O.DP).split(' – '); text(String(nb).replace(/\D/g, ''), 220, 287, 8, { max: 60 }); text(pos, 142, 305, 8, { max: 150 }); done.add('DP'); }
+    // dimensões: portail ou portillon
+    const col = v.kind === 'portillon' ? 555 : 507;
+    text(v.L, col, 243, 10, { right: true }); text(P.H1, col, 273, 10, { right: true }); text(P.H3, col, 303, 10, { right: true });
+    // sentido de abertura
+    if (v.sens) { if (v.kind === 'coulissant') cross(/droit/i.test(v.sens) ? 'coulD' : 'coulG'); else cross(/droit/i.test(v.sens) ? 'PD' : 'PG'); }
+    // pose (só a standard está impressa: o resto vai para as Observations)
+    if (P.poseTitre && /pente/i.test(P.poseTitre)) { cross(v.kind === 'portillon' ? 'penteT' : 'penteP'); obs.push(tr('Type de pose') + ' : ' + P.poseTitre + (P.deniv ? ' (' + String(P.deniv).replace('.', ',') + ' %)' : '')); }
+    else if (P.poseTitre && !/^Standard/i.test(P.poseTitre)) obs.push(tr('Type de pose') + ' : ' + P.poseTitre);
+    if (P.forme && P.forme !== 'A') obs.push(tr('Forme') + ' : ' + P.forme + (P.formeNom ? ' – ' + P.formeNom : ''));
+    // abertura
+    if (P.ouv && P.ouv !== 'manuelle') obs.push(tr("Type d'ouverture") + ' : ' + P.ouv);
+    if (P.ouv === 'manuelle' && P.arret) { cross('arret'); obs.push(P.arret); }
+    if (P.ouv === 'motorisée' && P.arret) { cross('butee'); if (/visser/i.test(P.arret)) cross('socle'); obs.push(P.arret); }
+    if (P.ouv === 'motorisable' && P.arret) cross(/cache/i.test(P.arret) ? 'cremProfil' : 'cremNylon');
+    // RAL fora do standard
+    const rn = String(P.ral || '').replace(/\D/g, '');
+    if (P.ral && !['7016', '8014', '9010'].includes(rn)) { cross('ralHors'); text(P.ral, 418, 606, 8, { max: 150 }); }
+    // opções
+    for (const [id, val] of Object.entries(O)) {
+      if (done.has(id)) continue;
+      const lab = L[id] || id;
+      if (String(id) === '113') { cross('tierce'); obs.push(lab + (typeof val === 'string' ? ' : ' + val : '')); }
+      else if (String(id) === '2') { if (/encastrer/i.test(val)) cross('gache'); else { cross('profilGache'); cross('gache'); } }
+      else obs.push(lab + (typeof val === 'string' ? ' : ' + val : ''));
+    }
+    // poteaux à sceller (100x100, 150x150, 200x200) e platines
+    const sec = { '100X100': 0, '150X150': 1, '200X200': 2 };
+    for (const p of P.poteaux || []) {
+      const i = sec[String(p.s).toUpperCase()]; if (i === undefined) continue;
+      text(p.qt, 352, [673, 690, 706.6][i], 9); text(p.h, 472, [674.4, 691, 707.6][i], 9, { max: 36 });
+      for (const o of p.opts || []) {
+        if (/platine/i.test(o)) text(p.qt, 352, i === 1 ? 739 : 723, 9);
+        else obs.push(`${tr('Poteaux')} ${p.s} : ${o}`);
+      }
+    }
+  }
+
   // Clôtures: tipo de clôture, troços (até 6, pela ordem das colunas), poteaux por tipo × secção × fixação
   const CL_FORME = { 1: [/^1 LISSE/], 2: [/^2 LISSES/], 3: [/^3 LISSES/], A: [/^BARREAUDEE/], B: [/^BARREAUX PLAQUES/], P: [/PANNEAU PLEIN/], O: [/^TOLE PLEIN/], C: [/^TOLE PERFOREE CARRE/], R: [/^TOLE PERFOREE RONDE/],
     S: [/^2 TRAVERSES/, /^SANS FER DE LANCE/], F: [/^2 TRAVERSES/, /^AVEC FERS DE LANCE/], T: [/^3 TRAVERSES/], 4: [/^4 TRAVERSES/] };
@@ -426,6 +507,12 @@ viewBox="0 0 17206.5 4581.43"
       if (miss.length) obs.push(`${k} : ${miss.join(' / ')}${/^E/.test(k) ? '' : ' mm'}`);
     }
     if (P.troncons.length > 6) obs.push(tr('Clôtures') + ' 7+ : ' + tr('voir la page suivante'));
+    // 22/10/2026: extremidades contra o muro sem poteau: étrier (lisses) ou embase (travessas); os ARCs Fluviale, Pierres Gemmes e Village têm as caixas OUI / NON
+    if (P.etr) {
+      const lisse = P.etr.tipo === 'lisse', rowRe = lisse ? /ETRIER.*LISSE AVEC$/ : /EMBASE.*TRAVERSE AVEC$/, rowNon = lisse ? /ETRIER.*LISSE AVEC OUI$/ : /EMBASE.*TRAVERSE AVEC OUI$/;
+      const ok = P.etr.on ? box(/^OUI$/, { row: rowRe }) : box(/^NON$/, { row: rowNon });
+      if (!ok && P.etr.on) obs.push(tr('Extrémités contre le mur sans poteau') + ' : ' + (lisse ? tr('étrier à visser (lisses)') : tr('embase à visser (traverses)')));
+    }
     // poteaux
     const put = (f, q) => { if (f && Number(q) > 0) { txt(f.name, q); return true; } return false; };
     if (P.clKind === 'as') {
@@ -487,7 +574,7 @@ viewBox="0 0 17206.5 4581.43"
       name('HAUTER_GRILLE', [...new Set(trs.map(x => x.H1).filter(Boolean))].join(' / '));
       const q = Object.values(P.pot || {}).reduce((a, it) => { for (const [k, n] of Object.entries(it)) a[/sceller/i.test(k) ? 's' : 'v'] += Number(n) || 0; return a; }, { s: 0, v: 0 });
       if (q.v) box(/^A VISSER$/, { row: /POTEAUX DE SOUTIEN$/ }); if (q.s) box(/^A SCELLER$/, { row: /POTEAUX DE SOUTIEN A VISSER$/ });
-      obs.push(tr('Clôture') + ' : ' + trs.map((x, i) => `${i + 1}) L1 ${x.L} / H1 ${x.H1} / H2 ${x.H2} / H0 ${x.H0}${x.H3 ? ' / H3 ' + x.H3 : ''}`).join(' ; '));
+      obs.push(tr('Clôture') + ' : ' + trs.map((x, i) => `${i + 1}) L1 ${x.L} / H1 ${x.H1} / H2 ${x.H2}${x.H3 ? ' / H3 ' + x.H3 : ''}`).join(' ; '));
       for (const [code, items] of Object.entries(P.pot || {})) { const d = Object.entries(items).filter(([, n]) => Number(n) > 0).map(([k, n]) => `${k} × ${n}`); if (d.length) obs.push(`${tr('Poteaux')} ${code} : ${d.join(', ')}`); }
       if (P.pMur) obs.push(tr('Extrémité de traverse à sceller dans le mur'));
       for (const [id, val] of Object.entries(P.opts || {})) { if (!(typeof val === 'string' && mark(hFuzzy(M, val)))) obs.push(((P.optLabels || {})[id] || id) + (typeof val === 'string' ? ' : ' + val : '')); }
@@ -503,6 +590,8 @@ viewBox="0 0 17206.5 4581.43"
     if (P.ouv === 'motorisable') { box(/^MOTORISABLE$/); box(/^NON$/, { row: /SERRURE$/ }); if (P.arret) box(/acier/i.test(P.arret) ? /^ACIER$/ : /^NYLON$/); }
     if (P.arret && /but/i.test(P.arret)) box(/^BUTEE D/); else if (P.arret && /arr.t/i.test(P.arret)) obs.push(P.arret);
     if (P.kitLabel) { box(/^FOURNIE PAR FERPLAY/); name('MODEL', P.kitLabel, 6); }
+    // gâche électrique (pergunta própria): à émission / à rupture
+    if (P.gache) { if (!box(/mission/i.test(P.gache) ? /^A EMISSION$/ : /^A RUPTURE$/)) obs.push(tr('Gâche électrique') + ' : ' + P.gache); }
     // pose e fixação
     if (P.fixTitre) {
       if (/pivot/i.test(P.fixTitre)) { box(/^A VISSER$/, { row: /PIVOTS/ }); if (!/roulement/i.test(P.fixTitre)) obs.push(tr('Fixation') + ' : ' + P.fixTitre); }
@@ -530,7 +619,10 @@ viewBox="0 0 17206.5 4581.43"
       const lab = (P.optLabels || {})[id] || id;
       if (/tierc/i.test(lab) && kind === 'battant') { box(/^INEGAUX \/ TIERCE/); obs.push(lab + ' : ' + val); continue; }
       if (/fers de lance/i.test(lab)) { box(/^FERS DE LANCE/); name('MODELE_MOTIFS', String(val), 7); continue; }
-      if (/manchon/i.test(String(val))) { if (box(/huit|n.?1/i.test(val) ? /^MANCHONS N.?1/ : /^MANCHONS N.?2/)) { obs.push(lab + ' : ' + val); continue; } }
+      if (/manchon/i.test(String(val))) {
+        const re = /huit|n.?1\b/i.test(val) ? /^MANCHONS N.?1/ : (/petit|n.?2\b/i.test(val) ? /^MANCHONS N.?2/ : null);
+        if (re && box(re)) { obs.push(lab + ' : ' + val); continue; }
+      }
       if (typeof val === 'string' && mark(hFuzzy(M, val))) continue;
       if (typeof val !== 'string' && mark(hFuzzy(M, lab))) continue;
       obs.push(lab + (typeof val === 'string' ? ' : ' + val : ''));
@@ -549,7 +641,12 @@ viewBox="0 0 17206.5 4581.43"
     if (/Autre/.test(P.pose || '')) { box(/^\.+$/); txt('AUTRE-POSE', P.poseAutre, 7); } else box(LDG_POSE[P.pose]);
     for (const [k, val] of Object.entries(P.cotes || {})) txt(k, val);
     if (P.config) { const bs = M.boxes.filter(b => b.name === 'ESCALIER').sort((a, b) => a.y - b.y); mark(bs[['Standard', 'A', 'B', 'C'].indexOf(P.config)]); }
-    if (P.portillon) { box(P.portillon === 'Vitré' ? /^VITRE$/ : /^BARREAUDE$/); if (P.portSens) box(/gauche/i.test(P.portSens) ? /^A GAUCHE$/ : /^A DROITE$/); }
+    if (P.portillon) {
+      box(P.portillon === 'Vitré' ? /^VITRE$/ : /^BARREAUDE$/);
+      // no ARC a pose e o tipo do portillon estão no mesmo grupo de rádio: o tipo marca o valor, a pose só a aparência
+      if (/dalle/i.test(P.portPose || '')) { const b = hBox(M, /^POSE SUR DALLE$/); if (b) markAt([b.x, b.y], { asOnly: true }); }
+      else if (P.portPose) P.horsArc.push(tr('Portillon – pose') + ' : ' + (P.portPoseAutre || P.portPose));
+      if (P.portSens) box(/gauche/i.test(P.portSens) ? /^A GAUCHE$/ : /^A DROITE$/); }
     for (const [k, q] of Object.entries(P.acc || {})) txt(k, q);
   }
 
@@ -692,12 +789,12 @@ viewBox="0 0 17206.5 4581.43"
         const r = w.getRectangle(); boxes.push({ f, w, on, x: r.x, y: PAGE_H - (r.y + r.height) });
       }
     }
-    const markAt = pt => {
+    const markAt = (pt, o) => {
       if (!pt) return false; const [x, y] = pt;
       let best = null, bd = 1e9;
       for (const b of boxes) { const d = Math.hypot(b.x - x, b.y - y); if (d < bd) { bd = d; best = b; } }
       if (!best || bd > 6) return false;
-      best.f.acroField.dict.set(PDFName.of('V'), best.on);
+      if (!(o && o.asOnly)) best.f.acroField.dict.set(PDFName.of('V'), best.on);
       best.w.setAppearanceState(best.on);
       return true;
     };
@@ -719,7 +816,8 @@ viewBox="0 0 17206.5 4581.43"
     const obsLines = [];
     if (client.livraison === 'chantier') markAt(H0.chantier);
     if (client.livraison === 'grue') { if (H0.grue) markAt(H0.grue); else { markAt(H0.chantier); obsLines.push(tr('Livraison sur chantier + déchargement avec grue')); } }
-    if (P.tpl) fillHab(T.M, P, v, txt, markAt, form, obsLines);
+    if (P.tpl === 'REGIONALE-SM') fillSM({ page: doc.getPages()[0], font, bold, client, P, v, t, idx, total, obs: obsLines });
+    else if (P.tpl) fillHab(T.M, P, v, txt, markAt, form, obsLines);
     else {
 
     const A = P.acc || {};
@@ -775,7 +873,7 @@ viewBox="0 0 17206.5 4581.43"
     if (P.trait === 'GALVA') box(P.ral ? 'galvaTherm' : 'galvaSans');
     if (P.ral) { box('couleur'); txt('COULEUR_RAL', P.ral, 7); }
     // outros enchimentos e acessórios
-    box('traverse', A.traverse); box('lisse', A.lisse); box('arretoir', A.arretoir);
+    box('traverse', A.traverse); box('lisse', A.lisse); box('arretoir', A.arretoir); box('gacheEm', A.gacheEm); box('gacheRup', A.gacheRup);
     box('toutTole', A.toutTole); box('soubas', A.partieBasse); box('micro', A.micro);
     if (A.grillage) {
       box(A.grillage.barreaux === 'avec' ? 'avecBarr' : 'sansBarr');
@@ -788,7 +886,7 @@ viewBox="0 0 17206.5 4581.43"
       try { const w = form.getTextField('Observations').acroField.getWidgets()[0].getRectangle(); lim = Math.max(80, Math.floor(w.width / 4.3) * Math.floor((w.height - 4) / 9.6) - (p.obs ? p.obs.length : 0) - 50 - (P.surMesure ? 45 : 0)); } catch (e) { }
       if (extra.length > lim) extra = extra.slice(0, lim - 10).replace(/\s+\S*$/, '') + ' … (' + tr('voir la page suivante') + ')';
     }
-    txt('Observations', [P.surMesure ? 'RÉGIONALE SUR MESURE' : '', p.obs, extra, tr('Détails complémentaires : voir la page suivante.')].filter(Boolean).join('\n'), 8);
+    txt('Observations', [P.surMesure && P.tpl !== 'REGIONALE-SM' ? 'RÉGIONALE SUR MESURE' : '', p.obs, extra, tr('Détails complémentaires : voir la page suivante.')].filter(Boolean).join('\n'), 8);
 
     form.updateFieldAppearances(font);
 
@@ -1591,6 +1689,21 @@ const I18N_SRC = {
   'Vitesse de fonctionnement': ['Velocidade de funcionamento', 'Operating speed'], '6 mètres/min': ['6 metros/min', '6 metres/min'], '9 mètres/min': ['9 metros/min', '9 metres/min'], '12 mètres/min': ['12 metros/min', '12 metres/min'],
   'Peu intensif': ['Pouco intensivo', 'Light use'],
   '{label} : valeur non valable (5 chiffres maximum)': ['{label}: valor inválido (máximo 5 algarismos)', '{label}: invalid value (5 digits maximum)'],
+  'Ouverture manuelle : de 9 à 12 %.': ['Abertura manual: de 9 a 12 %.', 'Manual opening: 9 to 12 %.'],
+  'Ouverture motorisée : de 2 à 16 %.': ['Abertura motorizada: de 2 a 16 %.', 'Motorised opening: 2 to 16 %.'],
+  'Ouverture manuelle : de 9 à 12 % · motorisée : de 2 à 16 %.': ['Abertura manual: de 9 a 12 % · motorizada: de 2 a 16 %.', 'Manual opening: 9 to 12 % · motorised: 2 to 16 %.'],
+  // aplicação das respostas da Ferplay (22/10/2026)
+  'Gâche électrique': ['Trinco elétrico', 'Electric strike'], 'Gâche électrique : type': ['Trinco elétrico: tipo', 'Electric strike: type'],
+  'À émission': ['De emissão', 'Emission type'], 'À rupture': ['De rutura', 'Rupture type'],
+  'Extrémités contre le mur sans poteau : étrier à visser (lisses)': ['Extremidades junto ao muro sem poste: estribo a aparafusar (réguas)', 'Ends against the wall without post: screw-on bracket (rails)'],
+  'Extrémités contre le mur sans poteau : embase à visser (traverses)': ['Extremidades junto ao muro sem poste: base a aparafusar (travessas)', 'Ends against the wall without post: screw-on base (crossbars)'],
+  'Extrémités contre le mur sans poteau': ['Extremidades junto ao muro sem poste', 'Ends against the wall without post'], 'étrier à visser (lisses)': ['estribo a aparafusar (réguas)', 'screw-on bracket (rails)'], 'embase à visser (traverses)': ['base a aparafusar (travessas)', 'screw-on base (crossbars)'],
+  'Hauteur de la clôture hors muret – H3': ['Altura da vedação fora do muro – H3', 'Fence height above the low wall – H3'],
+  'Poteau de 2 100 mm : Eco 75x75.': ['Poste de 2 100 mm: Eco 75x75.', '2,100 mm post: Eco 75x75.'],
+  'Largeur de passage {l} mm : {n} meneau(x) obligatoire(s) (lames de 1 500 mm maximum).': ['Largura de passagem {l} mm: {n} montante(s) obrigatório(s) (lâminas de 1 500 mm no máximo).', 'Clear width {l} mm: {n} mullion(s) required (slats 1,500 mm maximum).'],
+  'Meneaux obligatoires : {n}': ['Montantes obrigatórios: {n}', 'Mullions required: {n}'],
+  'Portillon assorti (type)': ['Portão a condizer (tipo)', 'Matching gate (type)'], 'Pose du portillon': ['Instalação do portão', 'Gate mounting'], 'Autre': ['Outra', 'Other'],
+  'Préciser la pose du portillon': ['Indicar a instalação do portão', 'Specify the gate mounting'], 'Portillon – pose': ['Portillon – instalação', 'Gate – mounting'],
 };
 const OPEN_DAY = { pt: ['à', 'a', 'ouvertures/jour', 'aberturas/dia'], en: ['à', 'to', 'ouvertures/jour', 'openings/day'] };
 let LANG = 'fr';
@@ -1782,6 +1895,7 @@ function fieldsFor(m, v) {
   for (const o of (m.options || []).filter(o => o.choix)) add({ k: 'o' + o.id, sec: 'Options – remplissage et habillage', label: o.label, type: 'select', opts: [['', 'Aucun'], ...o.choix], wide: true });
   for (const o of (m.options || []).filter(o => !o.choix)) {
     add({ k: 'o' + o.id, sec: 'Options – équipements', label: o.label, type: 'check' });
+    if (/modulec/i.test(o.label) && v['o' + o.id]) add({ k: 'o' + o.id + 't', sec: 'Options – équipements', label: 'Gâche électrique : type', type: 'radio', opts: ['À émission', 'À rupture'], req: true });
     if (isVentouse(o) && v['o' + o.id]) add({ k: 'ventouseQt', sec: 'Options – équipements', label: 'Nombre de ventouses', type: 'number', req: true, min: 1, max: 6, hard: true });
   }
   add({ k: 'obs', sec: 'Observations', label: 'Observations pour ce produit (demandes particulières, modifications…)', type: 'textarea' });
@@ -1884,6 +1998,7 @@ function fieldsHab(m, v) {
   if (d.fixeH) add({ k: 'H', sec: 'Dimensions', label: HL, type: 'select', opts: d.H.valores.map(x => [x, fmt(x) + ' mm']), req: true });
   else if (d.H) add({ k: 'H', sec: 'Dimensions', label: HL, type: 'number', unit: 'mm', req: true, min: d.H.min, max: d.H.max, soft: true });
   add({ k: 'qt', sec: 'Dimensions', label: 'Quantité', type: 'number', req: true, min: 1, max: 99, hard: true });
+  if (r.surMesure && /^HAALCORS(NO|PY)$/.test(m.rcode) && m.kind !== 'portillon' && Number(v.L) > 3000) add({ k: 'meneauxInfo', sec: 'Dimensions', type: 'info', text: tf('Largeur de passage {l} mm : {n} meneau(x) obligatoire(s) (lames de 1 500 mm maximum).', { l: fmt(v.L), n: Number(v.L) >= 3500 ? 2 : 1 }) });
   const c0 = habCalc(m, v);
   if (c0.H2 !== null) add({ k: 'calcInfo', sec: 'Dimensions', type: 'info', text: tf('Calculé comme dans le configurateur : H2 (hors gond) = {h2} mm · flèche {f} mm · H3 (à la flèche) = {h3} mm.', { h2: fmt(c0.H2), f: fmt(c0.F), h3: fmt(c0.H3) }) });
   // forma
@@ -1891,14 +2006,17 @@ function fieldsHab(m, v) {
   // pose e fixação
   const poses = HABR(r.poses) || [];
   if (poses.length) {
-    add({ k: 'pose', sec: 'Pose', label: 'Type de pose', type: 'radio', opts: poses.map(p => [String(p.id), p.titre]), req: true });
+    add({ k: 'pose', sec: 'Pose', label: 'Type de pose', type: 'radio', opts: poses.map(p => [String(p.id), p.titre, !!(r.surMesure && /pente/i.test(p.titre) && (v.ouv === 'motorisée' || v.ouv === 'motorisable'))]), req: true });
     const p = habPose(m, v);
     if (p) {
       add({ k: 'fix', sec: 'Pose', label: 'Fixation', type: 'radio', opts: p.fixations.map(f => [String(f.id), f.titre]), req: true });
       const fx = habFix(m, v);
       if (fx && fx.saisie && fx.saisie.campo) {
-        const s = fx.saisie, ok = Number(s.min) <= Number(s.max);
-        add({ k: 'deniv', sec: 'Pose', label: s.campo + (s.unidade ? ` (${s.unidade})` : ''), type: 'number', req: true, min: ok ? s.min : 0, max: ok ? s.max : 99, hard: ok, soft: !ok, dec: true });
+        // 22/10/2026 (Ferplay, via Gonçalo): dénivelé em abertura manual 9 a 12 %, em motorizada 2 a 16 % (o Chiffreur tem os limites trocados)
+        const s = fx.saisie, man = v.ouv === 'manuelle' || !!r.surMesure, mot = !r.surMesure && (v.ouv === 'motorisée' || v.ouv === 'motorisable');
+        const lo = man ? 9 : 2, hi = man ? 12 : 16;
+        add({ k: 'deniv', sec: 'Pose', label: s.campo + (s.unidade ? ` (${s.unidade})` : ''), type: 'number', req: true, min: lo, max: hi, hard: true, dec: true,
+          hint: man ? t('Ouverture manuelle : de 9 à 12 %.') : (mot ? t('Ouverture motorisée : de 2 à 16 %.') : t('Ouverture manuelle : de 9 à 12 % · motorisée : de 2 à 16 %.')) });
       }
     }
   }
@@ -1906,7 +2024,7 @@ function fieldsHab(m, v) {
   if ((r.sens || []).length) add({ k: 'sens', sec: 'Ouverture', label: "Sens d'ouverture (vue extérieure)", type: 'radio', opts: r.sens, req: true });
   const ouvs = HABR(r.ouverture) || [];
   if (portail && ouvs.length) {
-    add({ k: 'ouv', sec: 'Ouverture', label: "Type d'ouverture", type: 'radio', opts: ouvs.map(o => [o.mode, o.t]), req: true });
+    add({ k: 'ouv', sec: 'Ouverture', label: "Type d'ouverture", type: 'radio', opts: ouvs.map(o => [o.mode, o.t, !!(r.surMesure && o.mode !== 'manuelle' && /pente/i.test((habPose(m, v) || {}).titre || ''))]), req: true });
     const o = habOuv(m, v);
     if (o && o.options && o.options.length) add({ k: 'arret', sec: 'Ouverture', label: o.mode === 'manuelle' ? 'Arrêt latéral de blocage' : (o.mode === 'motorisable' ? 'Crémaillère' : "Butées d'arrêt"), type: 'radio', opts: [['', 'Sans'], ...o.options], req: false });
     if (o && o.opt && o.opt.liste) {
@@ -1944,6 +2062,10 @@ function fieldsHab(m, v) {
       if (items.length) add({ k: 'o' + o.id, sec: 'Options – décors', label: lab + ' (quantités)', type: 'qty', items });
     } else if (o.choix && o.choix.length) add({ k: 'o' + o.id, sec: 'Options', label: o.titre || lab, type: 'select', opts: [['', 'Aucun'], ...o.choix.map(c => [c, c, !!(o.horizA && v.forme && v.forme !== 'A' && /horizont/i.test(c))])], wide: true });
     else add({ k: 'o' + o.id, sec: 'Options', label: lab, type: 'check' });
+  }
+  if (m.famille === 'fer-habitat' && (m.kind === 'battant' || m.kind === 'portillon')) {
+    add({ k: 'gache', sec: 'Options', label: 'Gâche électrique', type: 'check' });
+    if (v.gache) add({ k: 'gacheT', sec: 'Options', label: 'Gâche électrique : type', type: 'radio', opts: ['À émission', 'À rupture'], req: true });
   }
   // poteaux (opção «Poteau de fixation à sceller»)
   const pt = HABR(r.poteaux);
@@ -1986,7 +2108,7 @@ function fieldsHab(m, v) {
 function habPdfValues(m, v) {
   if (m.ldg) return ldgPdfValues(m, v);
   const r = m.rec, c = habCalc(m, v), fx = habFix(m, v), po = habPose(m, v), o = habOuv(m, v);
-  const P = { tpl: m.tpl, surMesure: !!r.surMesure, sens: v.sens, modeleNom: r.surMesure && /^HAALCORSBO/.test(m.rcode) ? 'Bourgogne B' + (/vertic/i.test(v.oLO || '') ? 'V' : 'H') : m.label, modele: `${m.label} (${m.rcode})`, forme: v.forme, L: v.L, H1: v.H, H2: c.H2, H3: c.H3, qt: v.qt,
+  const P = { tpl: m.tpl, surMesure: !!r.surMesure, sens: v.sens, modeleNom: m.label, formeNom: (habForme(m, v) || {}).nom, modele: `${m.label} (${m.rcode})`, forme: v.forme, L: v.L, H1: v.H, H2: c.H2, H3: c.H3, qt: v.qt,
     ral: v.coul === '__autre' ? v.ralAutre : habColorTxt(v.coul), fin: v.fin, pose: po && po.id, poseTitre: po && po.titre, fix: fx && fx.id, fixTitre: fx && fx.titre, deniv: v.deniv,
     ouv: o && o.mode, arret: v.arret || '', opts: {}, optLabels: {}, horsArc: [] };
   const descr = ((HABR(r.descriptif) || {}).L || []).join(' ');
@@ -2002,6 +2124,7 @@ function habPdfValues(m, v) {
   }
   for (const id of r.optionfixe || []) { const op = (HABR(r.options) || []).find(o => String(o.id) === String(id)); if (op && (!v.forme || ((HABR(r.optionsParForme) || {})[v.forme] || []).map(String).includes(String(id)))) { P.opts[id] = true; P.optLabels[id] = op.nom || op.titre; } }
   P.potRec = v.potRec; P.potGui = v.potGui; P.potSec = v.potSec;
+  P.gache = v.gache ? v.gacheT : undefined;
   P.trait = v.trait; P.potS = v.potS; P.potG = v.potG; P.potR = v.potR; P.potH = v.potH; P.potFix = v.potFix; P.potTrappe = !!v.potTrappe;
   { const k = habKits(m, v).find(x => x.id === v.kit); if (k) P.kitLabel = k.label; }
   // poteaux
@@ -2011,6 +2134,7 @@ function habPdfValues(m, v) {
   const kit = habKits(m, v).find(k => k.id === v.kit);
   if (kit) { const acc = Object.entries(v.kitAcc || {}).filter(([, q]) => Number(q) > 0).map(([n, q]) => `${n} × ${q}`); P.horsArc.push(`${t('Kit moteur')} : ${kit.label}${acc.length ? ' (' + acc.join(', ') + ')' : ''}`); }
   if (o && o.opt) o.opt.liste.forEach((x, i) => { if (v['oo' + i]) P.horsArc.push(x); });
+  if (r.surMesure && /^HAALCORS(NO|PY)$/.test(m.rcode) && m.kind !== 'portillon' && Number(v.L) > 3000) P.horsArc.push(tf('Meneaux obligatoires : {n}', { n: Number(v.L) >= 3500 ? 2 : 1 }));
   if (m.kind === 'cloture') habPdfCloture(m, v, P);
   return P;
 }
@@ -2021,7 +2145,7 @@ function habPdfValues(m, v) {
 const habClKind = m => m.rec.cloture && m.rec.cloture.poteauxkl ? 'kl' : (m.rec.cloture && m.rec.cloture.poteauxbv ? 'bv' : 'as');
 const habEval = (expr, vars) => { try { const e = String(expr).replace(/\$H/g, 'H').replace(/[^0-9A-Za-z_<>=?:().,'+\-*/\s]/g, ''); return Function(...Object.keys(vars), 'return ' + e)(...Object.values(vars)); } catch (err) { return null; } };
 function habTroncons(v) { return Math.max(1, Math.min(6, Number(v.nTr) || 1)); }
-function habClMaxH(m, v) { let h = 0; for (let i = 1; i <= habTroncons(v); i++) h = Math.max(h, Number(v[(habClKind(m) === 'kl' ? 'H0_' : 'H1_') + i]) || 0); return h; }
+function habClMaxH(m, v) { let h = 0; for (let i = 1; i <= habTroncons(v); i++) h = Math.max(h, Number(v[(habClKind(m) === 'kl' ? 'H3_' : 'H1_') + i]) || 0); return h; }
 function habBvFix(m, v) {
   const pb = m.rec.cloture.poteauxbv, H = habClMaxH(m, v) || 0;
   const ok = String(habEval((pb.cond || [])[0] || "'A,B,C,D'", { H }) || 'A,B,C,D').split(',');
@@ -2040,16 +2164,14 @@ function fieldsHabCloture(m, v) {
     const sec = tf(kind === 'kl' ? 'Travée nº {n}' : 'Clôture nº {n}', { n: i });
     add({ k: 'L_' + i, sec, label: 'Largeur (entre maçonnerie) – L1', type: 'number', unit: 'mm', req: true, min: 100, max: 99999, hard: true });
     if (kind === 'kl') {
-      add({ k: 'H0_' + i, sec, label: 'Hauteur clôture hors muret (à la lisse haute) – H0', type: 'select', opts: hs.map(h => [String(h), fmt(h) + ' mm']), req: true });
-      add({ k: 'H3_' + i, sec, label: 'Hauteur du poteau hors muret – H3', type: 'number', unit: 'mm', req: false, min: 0, max: 5000, hard: true });
+      add({ k: 'H3_' + i, sec, label: 'Hauteur de la clôture hors muret – H3', type: 'select', opts: hs.map(h => [String(h), fmt(h) + ' mm']), req: true });
       add({ k: 'E15_' + i, sec, label: 'Nombre d’entraxes de 1500 (lames 1454 mm)', type: 'number', req: false, min: 0, max: 99, hard: true });
       add({ k: 'E20_' + i, sec, label: 'Nombre d’entraxes de 2000 (lames 1954 mm)', type: 'number', req: false, min: 0, max: 99, hard: true });
     } else {
       if (cl.fixeH) add({ k: 'H1_' + i, sec, label: 'Hauteur de fabrication (lisses comprises) – H1', type: 'select', opts: hs.map(h => [String(h), fmt(h) + ' mm']), req: true });
       else add({ k: 'H1_' + i, sec, label: 'Hauteur de fabrication (lisses comprises) – H1', type: 'number', unit: 'mm', req: true, min: hmin, max: hmax, soft: true });
       add({ k: 'H2_' + i, sec, label: 'Vide sous lisse – H2', type: 'number', unit: 'mm', req: true, min: 0, max: 1000, hard: true });
-      add({ k: 'H0_' + i, sec, label: 'Hauteur clôture hors muret (à la lisse haute) – H0', type: 'number', unit: 'mm', req: true, min: 0, max: 5000, hard: true });
-      add({ k: 'H3_' + i, sec, label: kind === 'bv' ? 'Hauteur hors muret du poteau – H3' : 'Hauteur hors tout (poteaux compris) – H3', type: 'number', unit: 'mm', req: false, min: 0, max: 5000, hard: true });
+      add({ k: 'H3_' + i, sec, label: kind === 'bv' ? 'Hauteur hors muret du poteau – H3' : 'Hauteur hors tout (poteaux compris) – H3', type: 'number', unit: 'mm', req: true, min: 0, max: 5000, hard: true });
     }
   }
   // poteaux
@@ -2078,6 +2200,11 @@ function fieldsHabCloture(m, v) {
     add({ k: 'potInfo', sec: ps, type: 'info', text: tf('Poteaux 76x41 avec closoirs de départ et de fin découpés et chapeaux · écart maximum entre poteaux : {x} m (selon la hauteur).', { x: String(habEval(cl.poteauxkl.ecartmax, { H: habClMaxH(m, v) }) || '').replace('.', ',') }) });
     for (const [k, lab] of KL_ROWS) add({ k: 'pkl_' + k, sec: ps, label: lab, type: 'qty', items: types });
   }
+  if (m.famille === 'alu-habitat') {
+    const lisse = ['1', '2', '3'].includes(String(v.forme));
+    add({ k: 'etr', sec: ps, label: lisse ? 'Extrémités contre le mur sans poteau : étrier à visser (lisses)' : 'Extrémités contre le mur sans poteau : embase à visser (traverses)', type: 'check' });
+  }
+  if (kind === 'kl') add({ k: 'potKl75', sec: ps, type: 'info', text: t('Poteau de 2 100 mm : Eco 75x75.') });
   // tratamento (Acier) e cor (Klolame: só RAL 7016 + outro RAL; Acier: conforme o tratamento)
   const trr = HABR(r.traitements), cpt = (trr && trr.couleursParTraitement) || {};
   if (trr && trr.liste) add({ k: 'trait', sec: 'Traitement', label: 'Traitement', type: 'radio', opts: trr.liste.map(x => [x.code, `${x.titre} – ${x.desc}`]), req: true });
@@ -2099,13 +2226,14 @@ function fieldsHabCloture(m, v) {
 function habPdfCloture(m, v, P) {
   const kind = habClKind(m), n = habTroncons(v);
   P.clKind = kind; P.troncons = [];
-  for (let i = 1; i <= n; i++) P.troncons.push({ L: v['L_' + i], H1: v['H1_' + i], H2: v['H2_' + i], H0: v['H0_' + i], H3: v['H3_' + i], E15: v['E15_' + i], E20: v['E20_' + i] });
+  for (let i = 1; i <= n; i++) P.troncons.push({ L: v['L_' + i], H1: v['H1_' + i], H2: v['H2_' + i], H3: v['H3_' + i], E15: v['E15_' + i], E20: v['E20_' + i] });
   const cl = m.rec.cloture || {};
   P.pot = {};
   if (kind === 'as') for (const tp of (cl.poteaux && cl.poteaux.types) || []) P.pot[tp.code] = v['p' + tp.code] || {};
   if (kind === 'bv') { const fx = Object.entries(cl.poteauxbv.fixations || {}); for (const k of ['angle', 'extr', 'int']) P.pot[k] = Object.fromEntries(Object.entries(v['pbv_' + k] || {}).map(([t, q]) => [(fx.find(([, x]) => x === t) || [t])[0], q])); }
   if (kind === 'kl') { const types = cl.poteauxkl.poteaux || []; for (const [k] of KL_ROWS) P.pot[k] = Object.fromEntries(Object.entries(v['pkl_' + k] || {}).map(([t, q]) => [types.indexOf(t) + 1, q])); }
   P.pMur = !!v.pMur; P.p8025 = v.p8025;
+  P.etr = m.famille === 'alu-habitat' ? { on: !!v.etr, tipo: ['1', '2', '3'].includes(String(v.forme)) ? 'lisse' : 'traverse' } : null;
   P.klo = /KLO\s*(\d+)/i.test(m.label) ? m.label.match(/KLO\s*(\d+)/i)[1] : null;
   P.ch = /^CH(\d)/i.test(m.label) ? m.label.match(/^CH(\d)/i)[1] : null;
   return P;
@@ -2128,8 +2256,7 @@ const LDG_TYPES = {
   'LDG-ACROTERE': { label: 'Garde-corps – pose sur acrotère', models: 'gc', poses: ['Sur muret', 'À l’anglaise'], mc: true, acc: true, cotes: [1, 2, 3, 4, 5, 6].map(i => ['MESURE' + i, tf('Cote {n} (voir le schéma du plan, vue du dessus)', { n: i })]) },
   'LDG-TERRASSE': { label: 'Garde-corps – terrasse', models: 'gc', poses: ['Sur dalle', 'À l’anglaise'], mc: true, cotes: [['CHAMP1', 'A – Épaisseur de la dalle'], ['CHAMP2', 'B (voir le schéma)'], ['CHAMP3', 'C – Pente de dalle'], ['CHAMP4', 'D – Débord de dalle'], ['CHAMP5', 'E – Épaisseur du revêtement'], ['LARGEUR-1', 'Largeur de la dalle sans débord'], ['LARGEUR-2', 'Largeur de la dalle avec débord']] },
   'LDG-GARDE-FOU': { label: 'Garde-fou (fenêtre)', models: 'gc', poses: ['Entre tableaux', 'Débord de tableau à l’anglaise', 'Débord de tableau sur rebord'], mc: true,
-    cotes: [['ENTRE-cote-fini', 'Entre tableaux – côte tableau maçonnerie finie'], ['ENTRE-rebord', 'Entre tableaux – rebord de fenêtre'], ['DEBORDE-cote-fini', 'À l’anglaise – côte tableau maçonnerie finie'], ['DEBORDE-rebord', 'À l’anglaise – rebord de fenêtre'], ['DEBORDE-cote-total', 'À l’anglaise – côte totale finie'], ['DEBORDE-ESQ', 'À l’anglaise – débord à gauche'], ['DEBORDE-DIR', 'À l’anglaise – débord à droite'],
-      ...[1, 2, 3, 4, 5].map(i => ['OPT' + i, tf('Coupe (à remplir dans les deux cas) – cote {n}', { n: i })]), ['DEGRE', 'Coupe – angle de l’appui (°)']] },
+    cotes: [['ENTRE-cote-fini', 'Entre tableaux – côte tableau maçonnerie finie'], ['ENTRE-rebord', 'Entre tableaux – rebord de fenêtre'], ['DEBORDE-cote-fini', 'À l’anglaise – côte tableau maçonnerie finie'], ['DEBORDE-rebord', 'À l’anglaise – rebord de fenêtre'], ['DEBORDE-cote-total', 'À l’anglaise – côte totale finie'], ['DEBORDE-ESQ', 'À l’anglaise – débord à gauche'], ['DEBORDE-DIR', 'À l’anglaise – débord à droite']] },   // 22/10/2026: o bloco «A remplir impérativement» (OPT1–5, Degré) não é para estar no ARC
   'LDG-RAMPANT': { label: 'Garde-corps – rampant (escalier)', models: 'gc', poses: ['Sur dalle', 'À l’anglaise'], mc: true, acc: true, config: ['Standard', 'A', 'B', 'C'],
     cotes: [['DEGRE', 'Angle de l’escalier (°)'], ['NOMBRE-MARCHES', 'Nombre de marches'], ['DEBORDE', 'Débord de nez de marche'], ...[1, 2, 3, 4, 5, 6].map(i => ['MESURE' + i, tf('Lecture en continu – mesure {n} (nez de marche)', { n: i })]), ['MESURE-S', 'S – Épaisseur de la dalle'], ['MESURE-T', 'T (voir le schéma)']] },
   'LDG-BPISCINE': { label: 'Barrière de piscine', models: 'bp', poses: ['Pose sur dalle', 'Autre pose (à préciser)'], mc: false, portillon: true,
@@ -2151,9 +2278,12 @@ function fieldsLdg(m, v) {
   add({ k: 'ral', sec: 'Finition', label: 'Teinte RAL (laquée)', type: 'text', req: true });
   for (const [k, lab] of d.cotes) add({ k: 'c_' + k, sec: 'Plan avec mesures (mm)', label: lab, type: 'number', req: false, min: 0, max: 99999, hard: true });
   if (d.portillon) {
-    add({ k: 'portillon', sec: 'Portillon piscine', label: 'Portillon assorti', type: 'radio', opts: [['', 'Sans portillon'], ['Barreaudé', 'Barreaudé'], ['Vitré', 'Vitré']], req: false, hint: t('Hauteur à la traverse : 1320 mm mini ; largeur entre poteaux : 1140 mm maxi ; ouverture vers l’extérieur obligatoire.') });
-    // no ARC, «Pose sur dalle», «Barreaudé» e «Vitré» do portillon são um só grupo de rádio: só se marca o tipo
-    if (v.portillon) { add({ k: 'portSens', sec: 'Portillon piscine', label: 'Ouverture (vers l’extérieur)', type: 'radio', opts: ['À gauche', 'À droite'], req: true }); }
+    add({ k: 'portillon', sec: 'Portillon piscine', label: 'Portillon assorti (type)', type: 'radio', opts: [['', 'Sans portillon'], ['Barreaudé', 'Barreaudé'], ['Vitré', 'Vitré']], req: false, hint: t('Hauteur à la traverse : 1320 mm mini ; largeur entre poteaux : 1140 mm maxi ; ouverture vers l’extérieur obligatoire.') });
+    // 22/10/2026 (Ferplay): tipo (vidro / barreaudé) e pose (sur dalle / outra) são duas escolhas
+    if (v.portillon) {
+      add({ k: 'portPose', sec: 'Portillon piscine', label: 'Pose du portillon', type: 'radio', opts: ['Sur dalle', 'Autre'], req: true });
+      if (v.portPose === 'Autre') add({ k: 'portPoseAutre', sec: 'Portillon piscine', label: 'Préciser la pose du portillon', type: 'text', req: true });
+      add({ k: 'portSens', sec: 'Portillon piscine', label: 'Ouverture (vers l’extérieur)', type: 'radio', opts: ['À gauche', 'À droite'], req: true }); }
   }
   if (d.acc && v.mc) add({ k: 'acc', sec: 'Accessoires pour main courante (quantités)', label: 'Accessoires', type: 'qty', items: LDG_ACC[v.mc].map(x => x[1]) });
   add({ k: 'photosInfo', sec: 'Photos et plan', type: 'info', text: t('Impératif : joignez les photos et le plan avec mesures (rubrique « Pièces jointes »). Sans ces éléments la commande ne sera pas traitée.') });
@@ -2162,7 +2292,7 @@ function fieldsLdg(m, v) {
 }
 function ldgPdfValues(m, v) {
   const d = LDG_TYPES[m.tpl], mod = LDG_MODELS[d.models].find(x => x[0] === v.modele) || [];
-  const P = { tpl: m.tpl, ldg: true, modele: v.modele, collection: mod[2] || '', mc: v.mc, pose: v.pose, poseAutre: v.poseAutre, ral: v.ral, config: v.config, portillon: v.portillon, portSens: v.portSens, cotes: {}, acc: {}, horsArc: [] };
+  const P = { tpl: m.tpl, ldg: true, modele: v.modele, collection: mod[2] || '', mc: v.mc, pose: v.pose, poseAutre: v.poseAutre, ral: v.ral, config: v.config, portillon: v.portillon, portSens: v.portSens, portPose: v.portPose, portPoseAutre: v.portPoseAutre, cotes: {}, acc: {}, horsArc: [] };
   for (const [k] of d.cotes) if (v['c_' + k] != null && v['c_' + k] !== '') P.cotes[k] = v['c_' + k];
   if (v.mc && v.acc) for (const [nm, lab] of LDG_ACC[v.mc]) if (Number(v.acc[lab]) > 0) P.acc[nm] = v.acc[lab];
   if (v.decor) P.horsArc.push(t('Décor de la tôle') + ' : ' + v.decor);
@@ -2284,6 +2414,7 @@ function productPdfIn(p) {
     else if (/ferme porte/.test(lab)) P.fermePorte = o.label.replace(/^.*LOCINOX\s*-?\s*/i, 'LOCINOX ');
     else if (isVentouse(o)) P.ventouse = v.ventouseQt || 1;
     else if (/sans poteaux/.test(lab)) { /* já está em «Poteaux» */ }
+    else if (/modulec/.test(lab)) { const tt = v['o' + o.id + 't'] || ''; A.gacheEm = /mission/i.test(tt); A.gacheRup = /rupture/i.test(tt); if (!A.gacheEm && !A.gacheRup) P.horsArc.push(full); }
     else P.horsArc.push(full);   // sem caixa no ARC rev 01.26: vai para «Observations» e para a página de detalhes
   }
   const dims = v.L && v.H ? ` – ${fmt(v.L)} × ${fmt(v.H)}` : (v.H ? ` – H ${fmt(v.H)}` : '');
