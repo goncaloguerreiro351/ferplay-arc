@@ -1040,7 +1040,8 @@ viewBox="0 0 17206.5 4581.43"
   // campos que a Ferplay pode preencher depois (prazo, preço, data de receção, observações)
   const FERPLAY_EDIT = /_(DELAI1?|PRIX NET|DATE_RECEPTION|DATE_RENVOI|Observations|Nº CMD)$/;
   // versão interna: a data de receção já vem preenchida e fica fechada
-  const FERPLAY_EDIT_INT = FERPLAY_EDIT;
+  // 22/10/2026: na versão interna TODOS os campos do PDF ficam editáveis (sem selo de alterações)
+  const FERPLAY_EDIT_INT = /./;
   function fieldValue(f) {
     const c = f.constructor.name;
     try {
@@ -1059,7 +1060,7 @@ viewBox="0 0 17206.5 4581.43"
     const re = interne ? FERPLAY_EDIT_INT : FERPLAY_EDIT;
     const values = readValues(doc, re);
     for (const f of doc.getForm().getFields()) if (!re.test(f.getName())) f.enableReadOnly();
-    return { v: 1, at: new Date().toISOString(), values };
+    return { v: 1, at: new Date().toISOString(), values, interne: !!interne };
   }
   // compara o PDF recebido com os valores gravados na geração
   async function verifyPdf(bytes) {
@@ -1067,6 +1068,7 @@ viewBox="0 0 17206.5 4581.43"
     const raw = doc.getInfoDict().lookup(PDFName.of('FerplayARC'));
     if (!raw) return { sealed: false };
     let seal; try { seal = JSON.parse(raw.decodeText()); } catch (e) { return { sealed: false }; }
+    if (seal.interne) return { sealed: true, interne: true, at: seal.at, changed: [], modDate: doc.getModificationDate() };   // PDF interno: tudo editável, nada a verificar
     const now = readValues(doc);
     const changed = [];
     for (const [k, v] of Object.entries(seal.values)) if ((now[k] ?? '') !== v) changed.push({ field: k, before: v, after: now[k] ?? '' });
