@@ -384,7 +384,7 @@ viewBox="0 0 17206.5 4581.43"
     let spec = (REGIO_BOX[base] || {})[kind]; if (typeof spec === 'function') spec = spec(v.L);
     const b = Array.isArray(spec) ? M.boxes.find(x => x.name === spec[0] && Math.abs(x.y - spec[1]) < 8) : M.boxes.find(x => x.name === spec);
     if (b) markAt([b.x, b.y]); else obs.push(tr('Modèle') + ' : ' + P.modele);
-    if (kind === 'coulissant') { const s = hBox(M, /ga/i.test(v.sens || '') ? /^OUVERTURE A GAUCHE/ : /^OUVERTURE A DROITE/); if (s) markAt([s.x, s.y]); }
+    if (kind === 'coulissant' && v.sens) { const s = hBox(M, /ga/i.test(v.sens || '') ? /^OUVERTURE A GAUCHE/ : /^OUVERTURE A DROITE/); if (s) markAt([s.x, s.y]); }
     const pq = (P.poteaux || []).filter(p => /^100X100$/i.test(p.s)).reduce((a, p) => a + p.qt, 0); if (pq) txt('QT_POTEAUX', pq);
     for (const p of (P.poteaux || []).filter(p => !/^100X100$/i.test(p.s))) obs.push(`${tr('Poteaux')} ${p.s} × ${p.qt}${p.h ? ' – H ' + p.h : ''}`);
     if (P.fin === 'MAT') obs.push(tr('Finition') + ' : MAT');
@@ -1838,7 +1838,7 @@ const isVentouse = o => /Ventouse 300kg/i.test(o.label);
 
 // Lista de campos visíveis para um modelo e os valores atuais
 // versão interna (22/10/2026): cor e acabamento (couleur, RAL, finition, traitement) não são obrigatórios
-const INTERNE_OPC = ['coul', 'ralAutre', 'fin', 'trait', 'ral'];
+const INTERNE_OPC = ['coul', 'ralAutre', 'fin', 'trait', 'ral', 'sens'];   // 'sens' = sentido de abertura
 function fieldsFor(m, v) {
   const F = fieldsForAll(m, v);
   if (INTERNE) for (const f of F) if (f.req && INTERNE_OPC.includes(f.k)) { f.req = false; f.autoOk = true; }
@@ -2239,7 +2239,7 @@ function fieldsHab(m, v) {
 function habPdfValues(m, v) {
   if (m.ldg) return ldgPdfValues(m, v);
   const r = m.rec, fx = habFix(m, v), po = habPose(m, v), o = habOuv(m, v);
-  const P = { tpl: m.tpl, surMesure: !!r.surMesure, sens: v.sens, modeleNom: m.label, formeNom: (habForme(m, v) || {}).nom, modele: `${m.label} (${m.rcode})`, forme: v.forme, L: v.L, H1: v.hRef && v.hRef !== 'H1' ? null : v.H, H2: v.hRef === 'H2' ? v.Hin2 : null, H3: v.hRef === 'H3' ? v.Hin3 : null, qt: v.qt,
+  const P = { tpl: m.tpl, surMesure: !!r.surMesure, sens: v.sens, modeleNom: m.label, formeNom: (habForme(m, v) || {}).nom, modele: m.label, forme: v.forme, L: v.L, H1: v.hRef && v.hRef !== 'H1' ? null : v.H, H2: v.hRef === 'H2' ? v.Hin2 : null, H3: v.hRef === 'H3' ? v.Hin3 : null, qt: v.qt,
     ral: v.coul === '__autre' ? v.ralAutre : habColorTxt(v.coul), fin: v.fin, pose: po && po.id, poseTitre: po && po.titre, fix: fx && fx.id, fixTitre: fx && fx.titre, deniv: v.deniv,
     ouv: o && o.mode, arret: v.arret || '', opts: {}, optLabels: {}, horsArc: [] };
   // alumínio battant/portillon: H1, H2 e H3 pelas regras (habHRule); o pilar tem sempre a altura H1
@@ -2512,7 +2512,7 @@ function productPdfIn(p) {
     return { title: p.indef ? uiTitle(p) : `${t(KIND_SHORT[m.kind])} ${m.ldg ? t(m.label) : m.label}${dims}`, status: warnings.length ? 'orange' : 'green', warnings: warnings.map(w => w.ui), v: { kind: m.kind, qt: v.qt, L: v.L, H: v.H, sens: v.sens }, pdf: P, details, obs: v.obs || '' };
   }
   // valores do ARC (semânticos; arc_pdf.js decide onde marcar em cada modelo rev 01.26)
-  const P = { modele: m.catalogueOnly ? `${m.label} (catalogue 2026)` : `${m.label} (${m.code})`, acc: {}, horsArc: [] };
+  const P = { modele: m.catalogueOnly ? `${m.label} (catalogue 2026)` : m.label, acc: {}, horsArc: [] };
   const ouv = m.ouv.length === 1 ? m.ouv[0] : v.ouv;
   const A = P.acc;
   if (['battant', 'coulissant', 'autoportant', 'portillon'].includes(m.kind)) {
