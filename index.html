@@ -533,6 +533,14 @@ viewBox="0 0 17206.5 4581.43"
       for (const [yq, yh] of [[673, 674.4], [690, 691], [706.6, 707.6]]) { text('', 352, yq, 9); text('', 472, yh, 9, { max: 36 }); }
       text('', 352, 723, 9); text('', 352, 739, 9);
       for (const k of Object.keys(SM_CHK)) chk(k, false);
+      // caixas marcadas com um X (como o resto dos ARCs e como a versão do cliente), em vez do tick por omissão do pdf-lib
+      const L = LIB, ink = L.rgb(0.08, 0.08, 0.10);
+      const xAppearance = (field, widget) => {
+        const r = widget.getRectangle(), w = r.width, h = r.height, m = 2.2;
+        const on = [L.pushGraphicsState(), L.setLineWidth(1.4), L.setStrokingColor(ink), L.moveTo(m, m), L.lineTo(w - m, h - m), L.moveTo(w - m, m), L.lineTo(m, h - m), L.stroke(), L.popGraphicsState()];
+        return { normal: { on, off: [] }, down: { on, off: [] } };
+      };
+      for (const k of Object.keys(boxes)) boxes[k].updateAppearances(xAppearance);
     }
   }
 
