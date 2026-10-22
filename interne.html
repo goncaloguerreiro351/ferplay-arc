@@ -874,6 +874,7 @@ viewBox="0 0 17206.5 4581.43"
         if (P.guidage === 'Simple') { box('potGuid'); txt(T.soutien[0], P.section); txt(T.soutien[1], P.section); }
         if (P.guidage === 'Portique') { box('portGuid'); txt(T.portGuid[0], P.section); txt(T.portGuid[1], P.section); }
         if (P.reception === 'Simple') { box('potRecep'); txt(T.recep[0], P.section); txt(T.recep[1], P.section); }
+        if (P.potH) { if (P.guidage === 'Simple') txt('HAUTEUR_POTEAU_DE_SOUTIEN', P.potH); if (P.reception === 'Simple') txt('HAUTEUR_POTEAU_DE_RÉCEPTION_SECTION', P.potH); }
         if (P.reception === 'Portique') { box('portRecep'); txt(T.portRecep[0], P.section); txt(T.portRecep[1], P.section); }
         const hasPot = P.guidage === 'Simple' || P.reception === 'Simple', hasPort = P.guidage === 'Portique' || P.reception === 'Portique';
         if (hasPot) { box(P.potFix === 'sceller' ? 'potS' : 'potV', !!P.potFix); box('trappes', P.trappe); }
@@ -885,6 +886,7 @@ viewBox="0 0 17206.5 4581.43"
       } else {
         if (P.poteaux) {
           box('potSoutien'); if (P.section) { txt(T.soutien[0], P.section); txt(T.soutien[1], P.section); }
+          if (P.potH) txt('HAUTEUR_POTEAU_DE_SOUTIEN', P.potH);
           box(P.potFix === 'sceller' ? 'potS' : 'potV', !!P.potFix);
         }
         box('trappes', P.trappe);
@@ -1142,6 +1144,7 @@ const I18N_SRC = {
   ' · H3 {h3} mm': [' · H3 {h3} mm', ' · H3 {h3} mm'],
   'H3 : choisissez d’abord la forme': ['H3: escolha primeiro a forma', 'H3: choose the shape first'],
   'H1 et H2 : choisissez d’abord la forme et la largeur.': ['H1 e H2: escolha primeiro a forma e a largura.', 'H1 and H2: choose the shape and the width first.'],
+  'Hauteur des poteaux : {h} mm (H + {d} mm).': ['Altura dos postes: {h} mm (H + {d} mm).', 'Post height: {h} mm (H + {d} mm).'],
   'À définir': ['A definir', 'To be defined'],
   'à définir': ['a definir', 'to be defined'],
   'variante à définir': ['variante a definir', 'variant to be defined'],
@@ -1881,6 +1884,11 @@ function fieldsForAll(m, v) {
     add({ k: 'guidage', sec: 'Poteaux', label: 'Poteaux de guidage', type: 'radio', opts: guidageOptions(m, v), req: true });
     add({ k: 'reception', sec: 'Poteaux', label: 'Poteaux de réception', type: 'radio', opts: receptionOptions(v), req: true });
   }
+  // Ferro (Gonçalo, 22/10/2026): os pilares têm a altura H + 90 mm, ou H + 130 mm com lisse défensive; o resto do Ferro é analisado, sem regras
+  if (Number(v.H) && ['battant', 'coulissant', 'autoportant', 'portillon'].includes(m.kind) && (v.potindus === 'Avec poteaux' || v.potca5 === '150' || v.potca5 === '200' || v.guidage === 'Simple' || v.reception === 'Simple')) {
+    const lis = (m.options || []).some(o => /lisse défensive/i.test(o.label) && v['o' + o.id]);
+    add({ k: 'potHinfo', sec: 'Poteaux', type: 'info', text: tf('Hauteur des poteaux : {h} mm (H + {d} mm).', { h: fmt(Number(v.H) + (lis ? 130 : 90)), d: lis ? 130 : 90 }) });
+  }
   if (m.rail) add({ k: 'rail', sec: 'Poteaux', label: 'Rail au sol', type: 'radio', opts: [['visser', 'À visser (tôle pliée 4 × 75 mm)'], ['sceller', 'À sceller (profil oméga 55 × 55)']], req: true });
   if (m.kind === 'cloture') {
     if (m.gamme === 'st') {
@@ -2079,13 +2087,17 @@ function fieldsHab(m, v) {
     // 22/10/2026 (Gonçalo): o cliente dá a altura que tiver (H1, H2 ou H3) e só essa vai para o ARC. Sem cálculos:
     // as fórmulas entre as H (habCalc) não estão certas; a Ferplay calcula as outras à mão até termos as fórmulas corretas.
     // Alumínio battant/portillon (5 gamas): as outras alturas calculam-se pelas regras de habHRule; nas restantes só vai a que o cliente dá.
+    const aluH = m.famille === 'alu-habitat';   // só o alumínio tem H1/H2/H3; no Ferro há só H
     const rule = habHRule(m);
     const hs = [['H1', m.kind === 'coulissant' ? 'H1 – hauteur' : 'H1 – hauteur aux piliers'], ['H2', 'H2 – hauteur au montant']];
     if (m.kind !== 'coulissant' && !(rule && (rule.h3 === false || v.forme === 'A'))) hs.push(['H3', 'H3 – hauteur à la flèche']);
     if (!hs.some(h => h[0] === v.hRef)) v.hRef = 'H1';
+    if (!aluH) { v.hRef = 'H1'; delete v.Hin2; delete v.Hin3; add({ k: 'H', sec: 'Dimensions', label: 'Hauteur', type: 'number', unit: 'mm', req: true, min: d.H.min, max: d.H.max, soft: true }); }
+    else {
     add({ k: 'hRef', sec: 'Dimensions', label: 'Hauteur connue', type: 'radio', opts: hs, req: true });
     if (v.hRef === 'H1') add({ k: 'H', sec: 'Dimensions', label: HL, type: 'number', unit: 'mm', req: true, min: d.H.min, max: d.H.max, soft: true });
     else add({ k: 'Hin' + v.hRef.slice(1), sec: 'Dimensions', label: hs.find(h => h[0] === v.hRef)[1], type: 'number', unit: 'mm', req: true, min: 100, max: 99999, hard: true });
+    }
     if (rule) {
       const ah = habAluH(m, v, rule);
       if (v.hRef !== 'H1') { if (ah && !ah.pendente) v.H = String(ah.H1); else delete v.H; }
@@ -2546,6 +2558,7 @@ function productPdfIn(p) {
     else P.horsArc.push(full);   // sem caixa no ARC rev 01.26: vai para «Observations»
   }
   const hv = v.H || v.Hin2 || v.Hin3, dims = v.L && hv ? ` – ${fmt(v.L)} × ${fmt(hv)}` : (v.H ? ` – H ${fmt(v.H)}` : '');
+  if (['battant', 'coulissant', 'autoportant', 'portillon'].includes(m.kind) && Number(v.H)) P.potH = Number(v.H) + (A.lisse ? 130 : 90);   // pilares do Ferro: H + 90 (H + 130 com lisse défensive)
   if (p.indef) P.modele = `${t('Modèle')} ${t('à définir')} (${t(m.gamme === 'co' ? 'Collectif' : m.gamme === 'sm' ? 'Industriel sur mesure' : 'Industriel standard')})`;
   return {
     title: p.indef ? `${t(KIND_SHORT[m.kind])} ${t('Modèle')} ${t('à définir')}${dims}` : `${t(KIND_SHORT[m.kind])} ${m.label}${dims}`,
