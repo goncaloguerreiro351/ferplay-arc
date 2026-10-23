@@ -1173,6 +1173,8 @@ viewBox="0 0 17206.5 4581.43"
     // O pdf-lib põe a base do texto a (altura − 0,73 × tamanho) / 2 acima do fundo do campo (medido no PDF gerado).
     function ajusta(f, name, s, size) {
       const ln = LN[name];
+      // 23/10/2026: as listas MOTIF-TOLE / MOTIF-LASER dos ARCs Fluviale, Pierres Gemmes e Village não têm /DA e o pdf-lib não muda o tamanho sem ele
+      if (!f.acroField.getDefaultAppearance()) f.acroField.setDefaultAppearance('/Helv 9 Tf 0 g');
       // o mesmo tamanho em todo o ARC (9 pt); o tamanho pedido pela chamada deixa de contar nos campos de uma linha
       if (f.setAlignment && f.acroField.getWidgets()[0].getRectangle().width > 100) f.setAlignment(LIB.TextAlignment.Left);   // texto longo junto ao rótulo
       for (const w of f.acroField.getWidgets()) {
