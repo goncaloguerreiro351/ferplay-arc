@@ -1346,6 +1346,15 @@ viewBox="0 0 17206.5 4581.43"
     fitField('Observations', obsTxt, 8, 5.5, 3.5);
 
     for (const fld of form.getFields()) { if (fld instanceof LIB.PDFDropdown) { const sel = (fld.getSelected() || [])[0]; if (sel) ajusta(fld, fld.getName(), ansi(sel), 9); } }
+    // 26/10/2026: campos que a Ferplay preenche depois (PRIX NET, Observations, DELAI…) ficavam vazios com o tamanho automático (0) ou
+    // enorme do modelo: o texto escrito no Acrobat saía em letras grandes e sem se poder mudar. Tamanho fixo em todos os campos de texto.
+    for (const fld of form.getFields()) {
+      if (!(fld instanceof LIB.PDFTextField)) continue;
+      const da = fld.acroField.getDefaultAppearance() || '', m = /([\d.]+)\s+Tf/.exec(da), sz0 = m ? parseFloat(m[1]) : 0;
+      if (sz0 > 0 && sz0 <= 12) continue;
+      if (!da) fld.acroField.setDefaultAppearance('/Helv 9 Tf 0 g');
+      fld.setFontSize(/Observations$/.test(fld.getName()) ? 8 : 9);
+    }
     form.updateFieldAppearances(font);
 
     // blocos «Non concerné»
