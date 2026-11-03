@@ -1292,7 +1292,9 @@ viewBox="0 0 17206.5 4581.43"
     if (client.interne) txt('DATE_RECEPTION', t.date);
     const H0 = T.head || HEAD;
     if (client.typeDoc === 'prix' ? H0.prix : H0.commande) markAt(client.typeDoc === 'prix' ? H0.prix : H0.commande);
-    txt('Nº CMD', client.ncde);
+    // 03/11/2026 (testes internos): com vários produtos no mesmo PDF, o Nº de encomenda leva uma letra (A, B, C…) em cada ARC, para se ver que são produtos da mesma encomenda
+    const letraArc = n => { let s = ''; for (n = n + 1; n > 0; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(65 + (n - 1) % 26) + s; return s; };
+    if (client.ncde) txt('Nº CMD', client.ncde + (total > 1 ? letraArc(idx - 1) : ''));
     txt('REF CLIENT', client.ref + (total > 1 ? `  (${idx}/${total})` : ''));
     txt('SOCIETE', client.societe);
     // cabeçalho dos ARCs LDG
