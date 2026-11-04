@@ -1220,6 +1220,17 @@ viewBox="0 0 17206.5 4581.43"
       }
     }
   }
+  // letra do campo (multilinha) que encolhe de 16 pt até 5 pt conforme o número de linhas (inclui as quebradas pela largura)
+  function autoShrinkField(fld) {
+    fld.enableMultiline();
+    const w = fld.acroField.getWidgets()[0].getRectangle(), W = w.width.toFixed(1), H = w.height.toFixed(1);
+    const js = 'var f=event.target;var s=event.willCommit?event.value:(event.value.substring(0,event.selStart)+event.change+event.value.substring(event.selEnd));'
+      + 'var z=16;for(;z>5;z-=0.5){var c=Math.floor((' + W + '-6)/(z*0.56)),n=0,p=String(s).split(/\\r\\n|\\r|\\n/);for(var i=0;i<p.length;i++){n+=Math.max(1,Math.ceil(p[i].length/c));}if(n*z*1.18<=' + H + '-4)break;}'
+      + 'if(f.textSize!=z)f.textSize=z;';
+    const ctx = fld.acroField.dict.context, act = () => ctx.obj({ S: PDFName.of('JavaScript'), JS: PDFHexString.fromText(js) });
+    fld.acroField.dict.set(PDFName.of('AA'), ctx.obj({ K: act(), V: act() }));
+  }
+
   async function fillOne(tpls, client, p, idx, total, fonts) {
     const v = p.v; const P = p.pdf || {}; // P = valores semânticos da página (ver productPdf em app.html)
     const tk = P.tpl || tplKind(v.kind);
@@ -1449,6 +1460,9 @@ viewBox="0 0 17206.5 4581.43"
       if (!da) fld.acroField.setDefaultAppearance('/Helv 9 Tf 0 g');
       fld.setFontSize(/Observations$/.test(fld.getName()) ? 8 : (/PRIX NET$/.test(fld.getName()) ? 16 : (/Nº CMD$/.test(fld.getName()) && !fld.getText() ? 16 : (cab ? 11 : 9))));   // 03/11/2026: preço e Nº de encomenda em letra maior
     }
+    // 04/11/2026: PRIX NET mantém o tamanho standard (16 pt) até duas linhas e, à medida que se escrevem mais linhas, a letra encolhe sozinha até caber
+    // (JavaScript do próprio campo: corre no Acrobat/Reader em cada tecla e ao sair do campo; noutros leitores fica no tamanho standard)
+    for (const fld of form.getFields()) if (fld instanceof LIB.PDFTextField && /PRIX NET$/.test(fld.getName())) autoShrinkField(fld);
     form.updateFieldAppearances(font);
     if (!FI) crossAppearances(doc, form);   // 03/11/2026 (feedback da Sónia): caixas quadradas, marcadas com uma cruz (✕); o pdf-lib refaz os rádios como círculos com ponto, por isso depois do updateFieldAppearances
 
