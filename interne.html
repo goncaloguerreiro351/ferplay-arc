@@ -5488,13 +5488,35 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
   function parseDevis(lines) {
     const L = lines.map(l => l.text);
     const out = { devis: '', refChiffreur: '', client: '', societe: '', contact: '', address: [], chantier: '', transport: '', products: [], isChiffreur: false };
-    const first = L.find(s => /^DEVIS\s*:/i.test(s)) || '';
-    if (first) { out.isChiffreur = true; const m = first.match(/^DEVIS\s*:\s*(.+?)\s*\/\s*(\d{2}-\d+)/i); if (m) { out.client = m[1].trim(); out.devis = m[2]; } const r = first.match(/R[ée]f\.?\s*:\s*(\S+)/i); if (r) out.refChiffreur = r[1]; }
+    const first = L.find(s => /^(DEVIS|Bon de Commande)\s*:/i.test(s)) || '';
+    if (first) { out.isChiffreur = true; out.isBon = /^Bon/i.test(first); const m = first.match(/^(?:DEVIS|Bon de Commande)\s*:\s*(.+?)\s*\/\s*(\d{2}-\d+)/i); if (m) { out.client = m[1].trim(); out.devis = m[2]; } const r = first.match(/R[ée]f\.?\s*:\s*(\S+)/i); if (r) out.refChiffreur = r[1]; }
     const NOVAL = /^(D[ée]lai|Condition|Validit|Descriptif)/i;
     const ic = L.findIndex(s => /^R[ée]f[ée]rence chantier/i.test(s));
     if (ic >= 0) {   // o valor vem na mesma linha («Référence chantier LORMEAU») ou na seguinte
       const same = L[ic].replace(/^R[ée]f[ée]rence chantier\s*:?\s*/i, '').trim(), nx = L[ic + 1] || '';
       out.chantier = same || (NOVAL.test(nx) ? '' : nx);
+    }
+    if (out.isBon) {   // 05/11/2026: «Bon de Commande» do Chiffreur (confirmação com o devis de origem)
+      const iv = L.findIndex(s => /^Commande pour devis/i.test(s));
+      if (iv >= 0) {
+        const mv = L[iv].match(/(\d{2}-\d+)/); if (mv) out.devis = mv[1];
+        out.chantier = (L[iv + 1] || '').trim();   // nome do cliente final / obra (ex.: SCI ELLE)
+        for (let k = iv + 1; k < Math.min(L.length, iv + 12); k++) {
+          let m;
+          if ((m = L[k].match(/^Soci[ée]t[ée]\s*:\s*(.+)$/i))) out.societe = m[1].trim();
+          else if ((m = L[k].match(/^Tel\s*:\s*(.+)$/i))) out.tel = m[1].trim();
+          else if ((m = L[k].match(/^Courriel\s*:\s*(\S+)/i))) out.email = m[1].trim();
+        }
+      }
+      const it = L.findIndex(s => /^Transport\s*:/i.test(s));
+      if (it >= 0) {
+        if (/sur chantier/i.test(L[it])) out.livraison = 'chantier';
+        const il = L.findIndex(s => /^Transport\s*:\s*Lieu de livraison/i.test(s));
+        if (il >= 0) {   // as linhas da morada ficam entre as linhas «Transport:» (o PDF as intercala): apanha-se tudo até ao «Total HT»
+          const adr = []; for (let k = it + 1; k < L.length && !/^(Total HT|Descriptif|P\.U)/i.test(L[k]) && adr.length < 8; k++) { if (/^Transport\s*:|^d[ée]chargement\)/i.test(L[k])) continue; adr.push(L[k]); }
+          out.address = adr; if (!out.livraison) out.livraison = 'chantier';
+        }
+      }
     }
     // bloco do cliente: depois de «Référence Devis : …» e até à linha do emissor (FERPLAY / Tel / SIRET / Courriel)
     const ib = L.findIndex(s => /^R[ée]f[ée]rence Devis/i.test(s));
@@ -5746,6 +5768,7 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
     // 05/11/2026 (Gonçalo): importar um PDF recomeça a página do zero: apaga o que lá estava (cliente e produtos) e mete só a informação do PDF
     const c0 = readClient(), c = {}; for (const k of CLIENT_KEYS) c[k] = ''; c.drec = c0.drec; c.typeDoc = 'commande'; c.livraison = '';
     S.products.length = 0;
+    if (d.livraison) c.livraison = d.livraison;
     if (d.refChiffreur) c.norcInt = d.refChiffreur;
     if (d.refInt) c.norcInt = d.refInt;   // referência do orçamento Ferplay citada pelo cliente (perfis de outros clientes)   // referência interna do devis (ex. A26-MR0154): na versão interna fica ao lado do Nº do devis do Chiffreur
     if (!c.tel && d.tel) c.tel = d.tel;
