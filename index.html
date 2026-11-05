@@ -1275,6 +1275,11 @@ viewBox="0 0 17206.5 4581.43"
         const ap = w.dict.lookup(AP), n = ap && ap.lookup ? ap.lookup(N) : null;
         if (!n || !n.keys) continue;
         const r = w.getRectangle(), m = Math.max(2, Math.min(r.width, r.height) * 0.2), W = r.width, H = r.height;
+        const dd = ap.lookup(PDFName.of('D'));   // 05/11/2026: a aparência «premido» (D) também levava círculos; cruz / vazio em todos os estados
+        if (dd && dd.keys) for (const key of dd.keys()) {
+          if (String(key) === '/Off') { dd.set(key, ctx.register(ctx.stream('', { Type: 'XObject', Subtype: 'Form', BBox: [0, 0, W, H] }))); continue; }
+          dd.set(key, ctx.register(ctx.stream(`q 0 G 1.4 w 1 J ${m.toFixed(2)} ${m.toFixed(2)} m ${(W - m).toFixed(2)} ${(H - m).toFixed(2)} l S ${m.toFixed(2)} ${(H - m).toFixed(2)} m ${(W - m).toFixed(2)} ${m.toFixed(2)} l S Q`, { Type: 'XObject', Subtype: 'Form', BBox: [0, 0, W, H] })));
+        }
         for (const key of n.keys()) {
           if (String(key) === '/Off') { n.set(key, ctx.register(ctx.stream('', { Type: 'XObject', Subtype: 'Form', BBox: [0, 0, W, H] }))); continue; }   // sem círculo: a caixa quadrada é do próprio ARC
           const st = ctx.stream(`q 0 G 1.4 w 1 J ${m.toFixed(2)} ${m.toFixed(2)} m ${(W - m).toFixed(2)} ${(H - m).toFixed(2)} l S ${m.toFixed(2)} ${(H - m).toFixed(2)} m ${(W - m).toFixed(2)} ${m.toFixed(2)} l S Q`, { Type: 'XObject', Subtype: 'Form', BBox: [0, 0, W, H] });
@@ -1308,6 +1313,9 @@ viewBox="0 0 17206.5 4581.43"
     }
     const doc = await PDFDocument.load(FI ? FICHE.base : tpls[SN || (P.aluInd ? ALU_ARC[tk] : tk)]);   // Alu Industriel: ALU-INDUST-<TIPO>.pdf (28/10/2026)
     const form = doc.getForm();
+    let socCut = false;   // o nome da empresa não coube nem na letra mínima: repete-se nas Observations
+    const origDA = new Map();   // 05/11/2026: /DA original de cada campo de texto (tamanho do ARC original: 14, 20…)
+    for (const f0 of form.getFields()) if (f0 instanceof LIB.PDFTextField) origDA.set(f0.getName(), f0.acroField.getDefaultAppearance() || '');
     const font = await doc.embedFont(StandardFonts.Helvetica);
     const bold = await doc.embedFont(StandardFonts.HelveticaBold);
     const has = n => { try { form.getField(n); return true; } catch (e) { return false; } };
@@ -1336,15 +1344,18 @@ viewBox="0 0 17206.5 4581.43"
       if (f.setAlignment && f.acroField.getWidgets()[0].getRectangle().width > 100) f.setAlignment(LIB.TextAlignment.Left);   // texto longo junto ao rótulo
       const nmA = name.replace(/^P\d+_/, '');
       if (f.setAlignment && /^(REF[ _-]CLIENT|Nº CMD)$/.test(nmA)) f.setAlignment(LIB.TextAlignment.Right);   // 03/11/2026: a ref. do cliente encostada à direita; 05/11/2026 (Sónia): o Nº de encomenda também
-      if (f.setAlignment && /^(SOCIETE|CLIENT)$/.test(nmA)) f.setAlignment(LIB.TextAlignment.Left);   // 05/11/2026 (Sónia): o nome do cliente à esquerda
+      if (f.setAlignment && /^(SOCIETE|CLIENT)$/.test(nmA)) f.setAlignment(LIB.TextAlignment.Right);   // 05/11/2026 (Gonçalo): o nome da empresa encostado à direita (a Sónia tinha pedido à esquerda; passa a direita)
       for (const w of f.acroField.getWidgets()) {
         const r = w.getRectangle();
         // 27/10/2026 (feedback do Alumínio): cabeçalho com os dados do cliente e o Nº CDE em letra maior (11 pt; encolhe só se não couber)
         const nm0 = name.replace(/^P\d+_/, '');
-        let sz = /^Nº CMD$/.test(nm0) ? 16 : (/^(EXPEDITEUR|SOCIETE|CLIENT|TELEPHONE|REF[ _-]CLIENT)$/.test(nm0) ? 11 : 9);   // 03/11/2026 (testes internos): Nº de encomenda a 16 pt
+        let sz = /^Nº CMD$/.test(nm0) ? 16 : (/^(EXPEDITEUR|SOCIETE|CLIENT|TELEPHONE|REF[ _-]CLIENT)$/.test(nm0) ? 11 : 9);
+        { const tm = /([\d.]+)\s+Tf/.exec(origDA.get(f.getName ? f.getName() : name) || ''); const tsz = tm ? parseFloat(tm[1]) : 0; if (tsz > sz) sz = Math.min(tsz, 20); }   // 05/11/2026 (Alu): letra maior, a do ARC original (14, 20…), que encolhe só se não couber   // 03/11/2026 (testes internos): Nº de encomenda a 16 pt
         if (!ln || ln.box) sz = Math.min(sz, Math.max(5, (r.height - 1.5) / 1.18));
         const fw = /^(Nº CMD|REF[ _-]CLIENT|REF-CLIENT)$/.test(nm0) ? bold : font;   // 05/11/2026: Nº de encomenda e ref. do cliente em negrito
-        while (sz > 4.5 && fw.widthOfTextAtSize(s, sz) > r.width - 3) sz -= 0.25;
+        const minSz = /^(SOCIETE|CLIENT)$/.test(nm0) ? 3.5 : 4.5;   // 05/11/2026: o nome da empresa encolhe até 3,5 pt e nunca desaparece
+        while (sz > minSz && fw.widthOfTextAtSize(s, sz) > r.width - 3) sz -= 0.25;
+        if (/^(SOCIETE|CLIENT)$/.test(nm0) && fw.widthOfTextAtSize(s, sz) > r.width - 3) socCut = true;
         if (ln && ln.base != null) {
           const h = sz * 1.35 + 2, fundo = ln.base + (h - 0.73 * sz) / 2 - 0.05;
           w.setRectangle({ x: r.x, y: PAGE_H - fundo, width: r.width, height: h });
@@ -1523,6 +1534,7 @@ viewBox="0 0 17206.5 4581.43"
     }
     const opts = [...obsLines, ...(FI ? [] : (P.horsArc || []))];
     const obsTxt = [
+      socCut ? tr('Société') + ' : ' + client.societe : '',   // 05/11/2026: nunca perder o nome da empresa
       client.typeDoc === 'commande' && client.norc ? tr('Devis') + ' ' + tr('Nº') + ' ' + client.norc : '',   // 05/11/2026 (Sónia): Nº do orçamento no topo das observações
       !FI && P.surMesure && P.tpl !== 'REGIONALE-SM' ? 'RÉGIONALE SUR MESURE' : '',
       p.obs,
@@ -1530,7 +1542,7 @@ viewBox="0 0 17206.5 4581.43"
       p.warnings && p.warnings.length ? p.warnings.join(' ; ') : '',   // cada aviso já diz «à étudier par Ferplay»
       p.pj && p.pj.length ? tr('Pièces jointes') + ' : ' + p.pj.join(', ') : ''
     ].filter(Boolean);
-    fitField('Observations', obsTxt, 8, 5.5, 3.5);
+    fitField('Observations', obsTxt, 10, 6.5, 3.5);   // 05/11/2026 (Alu): observações em letra maior (até 10 pt), encolhe até caber
 
     for (const fld of form.getFields()) { if (fld instanceof LIB.PDFDropdown) { const sel = (fld.getSelected() || [])[0]; if (sel) ajusta(fld, fld.getName(), ansi(sel), 9); } }
     // 26/10/2026: campos que a Ferplay preenche depois (PRIX NET, Observations, DELAI…) ficavam vazios com o tamanho automático (0) ou
@@ -1543,7 +1555,7 @@ viewBox="0 0 17206.5 4581.43"
       const da = fld.acroField.getDefaultAppearance() || '', m = /([\d.]+)\s+Tf/.exec(da), sz0 = m ? parseFloat(m[1]) : 0;
       const cab = /^(EXPEDITEUR|SOCIETE|CLIENT|TELEPHONE|REF[ _-]CLIENT|Nº CMD)$/.test(fld.getName()) && !fld.getText();   // cabeçalho (só se vazio) em 11 pt (feedback do Alu, 27/10)
       if (/Nº CMD$/.test(fld.getName()) && fld.getText()) continue;   // preenchido: o tamanho já foi ajustado
-      if (sz0 > 0 && sz0 <= 12 && !(cab && sz0 < 11)) continue;
+      if (sz0 > 0 && !(cab && sz0 < 11)) continue;   // 05/11/2026: mantém o tamanho do ARC original (até 20 pt); só se corrige o automático (0) e o cabeçalho pequeno
       if (!da) fld.acroField.setDefaultAppearance('/Helv 9 Tf 0 g');
       fld.setFontSize(/Observations$/.test(fld.getName()) ? 8 : (/PRIX NET$/.test(fld.getName()) ? 16 : (/Nº CMD$/.test(fld.getName()) && !fld.getText() ? 16 : (cab ? 11 : 9))));   // 03/11/2026: preço e Nº de encomenda em letra maior
     }
@@ -1551,6 +1563,8 @@ viewBox="0 0 17206.5 4581.43"
     // o pdf-lib grava o tamanho automático calculado (45 pt) no /DA: repõe-se o tamanho 0 (automático) do ARC original
     for (const [fld, da] of prixDA) { fld.acroField.setDefaultAppearance(da); }   // 05/11/2026: tamanho automático (0) como no ARC original: o leitor desenha o texto à medida que se escreve
     for (const fld of form.getFields()) if (fld instanceof LIB.PDFTextField && /^(P\d+_)?(Nº CMD|REF[ _-]CLIENT|REF-CLIENT)$/.test(fld.getName())) fld.updateAppearances(bold);   // 05/11/2026 (Sónia): negrito
+    // 05/11/2026: aparência gerada com a letra maior acima; o /DA volta ao tamanho automático (0) do ARC original, para a letra encolher sozinha ao escrever (Chrome e Acrobat)
+    for (const f1 of form.getFields()) if (f1 instanceof LIB.PDFTextField && !/PRIX NET$/.test(f1.getName())) { const o1 = origDA.get(f1.getName()) || ''; f1.acroField.setDefaultAppearance(o1 ? o1.replace(/[\d.]+\s+Tf/, '0 Tf') : '/Helv 0 Tf 0 g'); }
     if (!FI) crossAppearances(doc, form);   // 03/11/2026 (feedback da Sónia): caixas quadradas, marcadas com uma cruz (✕); o pdf-lib refaz os rádios como círculos com ponto, por isso depois do updateFieldAppearances
 
     // blocos «Non concerné»
@@ -1701,6 +1715,13 @@ viewBox="0 0 17206.5 4581.43"
 // [pt, en]
 const I18N_SRC = {
   // cabeçalho, faixas, estado
+  'Finition de la couleur': ['Finição da cor', 'Colour finish'],
+  'Le formulaire contient déjà un autre client': ['O formulário já tem outro cliente', 'The form already contains another client'],
+  'ses coordonnées ne sont pas remplacées. Utilisez « Recommencer » pour une nouvelle demande.': ['os dados dele não são substituídos. Use «Recomeçar» para um novo pedido.', 'its details are not replaced. Use « Start over » for a new request.'],
+  'Commande': ['Encomenda', 'Order'],
+  'PDF digitalisé (image) : remplissez à la main, aucun texte lisible.': ['PDF digitalizado (imagem): preencha à mão, não há texto legível.', 'Scanned PDF (image): fill in by hand, no readable text.'],
+  'champ(s) lu(s) (modèle à choisir)': ['campo(s) lido(s) (modelo por escolher)', 'field(s) read (model to choose)'],
+  'Ouvrir dans l’éditeur pour choisir le modèle': ['Abrir no editor para escolher o modelo', 'Open in the editor to choose the model'],
   'Options – remplissage et tôles': ['Opções – enchimentos e chapas', 'Options – infill and sheet'],
   'Options – serrures et gâches': ['Opções – fechaduras e gáches', 'Options – locks and strikes'],
   'Options – ventouses': ['Opções – ventosas', 'Options – magnetic locks'],
@@ -3168,6 +3189,7 @@ function fieldsForAll(m, v) {
   if (v.trait !== 'GALVA' || v.galvaLaq === 'avec') {
     add({ k: 'coul', sec: 'Finition', label: 'Couleur', type: 'select', opts: [...m.couleurs.map(c => [c, `${c} – ${t(COLORS[c] || '')}`]), ['__autre', 'Autre RAL (saisie manuelle)']], req: true });
     if (v.coul === '__autre') add({ k: 'ralAutre', sec: 'Finition', label: 'Référence RAL', type: 'text', req: true, hint: t('Attention, voir la disponibilité du RAL hors standard avec l’usine.'), hintRed: true });
+    if (v.coul) add({ k: 'finRal', sec: 'Finition', label: 'Finition de la couleur', type: 'radio', opts: ['Texturé', 'Mat'], deselect: true, req: false });   // 05/11/2026 (feedback interno): finição da cor (texturado / mat), facultativa e desmarcável
   }
   // --- opções
   // 05/11/2026 (feedback interno): as opções vêm agrupadas por tipo, como no ARC (remplissage e tôles / serrures e fermetures / acessórios e equipamentos)
@@ -3395,6 +3417,7 @@ function habPdfFerHab(m, v, P) {
     }
     if (v.fo_dom) P.fhDom = v.fo_dom;
     if (v.finTole) P.horsArc.push(t('Finition de la tôle') + ' : ' + t(v.finTole));
+    if (v.finRal) P.horsArc.push(t('Finition de la couleur') + ' : ' + t(v.finRal));
     if (v.fo_autre) P.fhAutre = v.fo_autre;
   }
 }
@@ -3597,7 +3620,8 @@ function fieldsHab(m, v) {
   if (!(v.trait === 'BRUT' || (v.trait && cpt[v.trait] && !cpt[v.trait].length))) add({ k: 'coul', sec: 'Finition', label: 'Couleur', type: 'select', opts: [...cols.map(c => [c.reference, `${c.reference.replace(/^RAL/, 'RAL ')} – ${c.nom}`]), ['__autre', 'Autre RAL (saisie manuelle)']], req: true });
   if (v.coul === '__autre' && v.trait !== 'BRUT' && !(v.trait && cpt[v.trait])) add({ k: 'ralAutre', sec: 'Finition', label: 'Référence RAL', type: 'text', req: true, hint: t('Attention, voir la disponibilité du RAL hors standard avec l’usine.'), hintRed: true });
   const fins = v.coul && v.coul !== '__autre' ? habFinitions(m, v.coul) : habFinitions(m, '');
-  if (fins.length) add({ k: 'fin', sec: 'Finition', label: 'Finition', type: 'radio', opts: fins, req: true });
+  if (fins.length) add({ k: 'fin', sec: 'Finition', label: 'Finition', type: 'radio', opts: fins, req: true, deselect: true });
+  else if (v.coul) add({ k: 'finRal', sec: 'Finition', label: 'Finition de la couleur', type: 'radio', opts: ['Texturé', 'Mat'], deselect: true, req: false });   // 05/11/2026
   habFinExtra(m, v, add);
   // opções (dependem da forma)
   if (!v.forme && (r.formes || []).length) add({ k: 'optInfo', sec: 'Options', type: 'info', text: t('Choisissez d’abord la forme : les options dépendent de la forme.') });
@@ -3856,7 +3880,8 @@ function fieldsHabCloture(m, v) {
   if (!(v.trait && cpt[v.trait] && !cpt[v.trait].length)) add({ k: 'coul', sec: 'Finition', label: 'Couleur', type: 'select', opts: [...cols.map(c => [c.reference, `${c.reference.replace(/^RAL/, 'RAL ')} – ${c.nom}`]), ...(v.trait && cpt[v.trait] ? [] : [['__autre', 'Autre RAL (saisie manuelle)']])], req: true });
   if (v.coul === '__autre') add({ k: 'ralAutre', sec: 'Finition', label: 'Référence RAL', type: 'text', req: true, hint: t('Attention, voir la disponibilité du RAL hors standard avec l’usine.'), hintRed: true });
   const fins = habFinitions(m, v.coul && v.coul !== '__autre' ? v.coul : '');
-  if (fins.length) add({ k: 'fin', sec: 'Finition', label: 'Finition', type: 'radio', opts: fins, req: true });
+  if (fins.length) add({ k: 'fin', sec: 'Finition', label: 'Finition', type: 'radio', opts: fins, req: true, deselect: true });
+  else if (v.coul) add({ k: 'finRal', sec: 'Finition', label: 'Finition de la couleur', type: 'radio', opts: ['Texturé', 'Mat'], deselect: true, req: false });   // 05/11/2026
   habFinExtra(m, v, add);
   // opções (por tipo de clôture)
   for (const o of habOptionList(m, v)) {
@@ -4211,6 +4236,7 @@ function fieldsAluCl(m, v) {
   if (m.code === 'ALUI:ULY2') add({ k: 'biseau', sec: 'Options – équipements', label: 'Coupe biseautée en partie haute', type: 'check' });
   add({ k: 'coul', sec: 'Finition', label: 'Couleur', type: 'select', opts: [...m.couleurs.map(c => [c, `${c} – ${t(COLORS[c] || '')}`]), ['__autre', 'Autre RAL (saisie manuelle)']], req: true });
   if (v.coul === '__autre') add({ k: 'ralAutre', sec: 'Finition', label: 'Référence RAL', type: 'text', req: true, hint: t('Attention, voir la disponibilité du RAL hors standard avec l’usine.'), hintRed: true });
+  if (v.coul) add({ k: 'finRal', sec: 'Finition', label: 'Finition de la couleur', type: 'radio', opts: ['Texturé', 'Mat'], deselect: true, req: false });   // 05/11/2026
   add({ k: 'obs', sec: 'Observations', label: 'Observations pour ce produit (demandes particulières, modifications…)', type: 'textarea' });
   return F;
 }
@@ -4294,6 +4320,7 @@ function fieldsAluInd(m, v) {
   // --- acabamento (alumínio: só thermolaquage RAL; os tratamentos de aço do ARC ficam sem caixa, decisão 44.1)
   add({ k: 'coul', sec: 'Finition', label: 'Couleur', type: 'select', opts: [...m.couleurs.map(c => [c, `${c} – ${t(COLORS[c] || '')}`]), ['__autre', 'Autre RAL (saisie manuelle)']], req: true });
   if (v.coul === '__autre') add({ k: 'ralAutre', sec: 'Finition', label: 'Référence RAL', type: 'text', req: true, hint: t('Attention, voir la disponibilité du RAL hors standard avec l’usine.'), hintRed: true });
+  if (v.coul) add({ k: 'finRal', sec: 'Finition', label: 'Finition de la couleur', type: 'radio', opts: ['Texturé', 'Mat'], deselect: true, req: false });   // 05/11/2026
   // --- opções (tarif p.235–237): as que têm caixa no ARC marcam-na, as outras vão para as Observations
   add({ k: 'o_micro', sec: 'Options – remplissage et habillage', label: 'Tôle microperforée (3 mm, Ø5 R5 T8)', type: 'select', opts: [['', 'Aucun'], ['cadre', 'Montée sur cadre (sans le barreaudage)'], ['applique', 'Montée en applique sur barreaudage']], wide: true });
   add({ k: 'o_soub', sec: 'Options – remplissage et habillage', label: 'Tôle en partie basse (aluminium 30/10, traverse intermédiaire comprise)', type: 'select', opts: [['', 'Aucun'], ['500', 'Soubassement jusqu’à 500 mm de hauteur'], ['600', 'Soubassement de plus de 500 mm jusqu’à 600 mm'], ['1000', 'Soubassement de plus de 600 mm jusqu’à 1 000 mm']], wide: true });
@@ -4384,6 +4411,7 @@ function aluProductPdf(p, m, v0, F, warnings) {
   // serrure: manual battant/portillon pergunta; coulissant/autoportant levam sempre (Locinox se barreaudé 30x30, Portac à crochet nos restantes); motorisable battant: sem serrure
   if (m.fam === '45') { P.serrure = true; P.serLoc = (v.rempl || 'BARR') === 'BARR' || !!v.o_lsk; }
   else P.serrure = v.serrure ? v.serrure === 'oui' : (motor ? false : undefined);
+  if (v.finRal) P.horsArc.push(t('Finition de la couleur') + ' : ' + t(v.finRal));
   if (ouv === 'motorise' && v.m_src === 'ferplay' && v.m_app) P.kit = String(v.m_app).split(' – ')[0];
   if (ouv === 'motorise' && v.m_src === 'client') { P.marque = v.m_marque; P.modeleMot = v.m_modele; }
   if (ouv === 'motorise') {
@@ -4616,6 +4644,7 @@ function productPdfIn(p) {
     if (m.vantaux) P.vantaux = v.vantaux;   // decisão 11: 2v / tierce / mono
     if (ouv === 'motorise' && v.m_src === 'ferplay' && v.m_app) P.kit = String(v.m_app).split(' – ')[0];   // decisão 14: kit do tarif → MODEL no ARC
     if (v.finTole) P.horsArc.push(t('Finition de la tôle') + ' : ' + t(v.finTole));
+    if (v.finRal) P.horsArc.push(t('Finition de la couleur') + ' : ' + t(v.finRal));
     if (v.platGonds) P.horsArc.push(t('Platine pour gonds'));
     P.rail = v.rail === 'sem' ? undefined : v.rail;
     if (v.rail === 'sem') P.horsArc.push(t('Rail au sol') + ' : ' + t('Sans guide au sol'));
@@ -4759,7 +4788,7 @@ function renderEditor() {
   sec.hidden = false;
   const v = editing.v;
   $('edTitle').textContent = editing.index < 0 ? t('Nouveau produit') : tf('Modifier le produit {n}', { n: editing.index + 1 });
-  const radio = (name, opts, cur) => `<div class="opts">${opts.map(o => { const [val, lab, dis] = optVal(o); return `<label class="opt"><input type="radio" name="${name}" value="${esc(val)}" ${String(cur) === String(val) ? 'checked' : ''} ${dis ? 'disabled' : ''}><span>${esc(t(lab))}</span></label>`; }).join('')}</div>`;
+  const radio = (name, opts, cur, desel) => `<div class="opts">${opts.map(o => { const [val, lab, dis] = optVal(o); return `<label class="opt"><input type="radio" name="${name}" value="${esc(val)}" ${desel ? 'data-desel="1"' : ''} ${String(cur) === String(val) ? 'checked' : ''} ${dis ? 'disabled' : ''}><span>${esc(t(lab))}</span></label>`; }).join('')}</div>`;
   // uma só opção e obrigatória: escolhe-se sozinha e o passo não aparece (menos um clique)
   const only = (key, opts) => { const en = opts.map(optVal).filter(o => !o[2] && String(o[0]) !== ''); if (en.length === 1) { if (v[key] !== en[0][0]) { v[key] = en[0][0]; editing.auto = true; } return true; } return false; };
   const step = (lab, key, opts, cur) => only(key, opts) ? '' : `<div class="f"><span class="lab req">${t(lab)}</span>${radio('e_' + key, opts, cur)}</div>`;
@@ -4841,7 +4870,7 @@ function renderEditor() {
       const cls = 'f' + (errMsg ? ' has-err' : '') + (wK.get(f.k) ? ' has-wrn' : '') + ((['radio', 'qty', 'textarea', 'info'].includes(f.type) || f.wide) ? ' full' : '') + (f.type === 'check' ? ' ckcard' + (val ? ' on' : '') : '');
       h += `<div class="${cls}" data-k="${f.k}">`;
       const lab = f.label ? `<span class="lab ${f.req ? 'req' : ''}">${esc(t(f.label))}</span>` : '';
-      if (f.type === 'radio') h += lab + radio('f_' + f.k, f.opts, val);
+      if (f.type === 'radio') h += lab + radio('f_' + f.k, f.opts, val, f.deselect);
       else if (f.type === 'select') h += `<label class="${f.req ? 'req' : ''}" for="f_${f.k}">${esc(t(f.label))}</label><select id="f_${f.k}" name="f_${f.k}">${f.opts.some(o => String(optVal(o)[0]) === '') ? '' : '<option value=""></option>'}${f.opts.map(o => { const [ov, ol, dis] = optVal(o); return `<option value="${esc(ov)}" ${String(val) === String(ov) ? 'selected' : ''} ${dis ? 'disabled' : ''}>${esc(t(ol))}${dis ? ' ' + t('(non disponible)') : ''}</option>`; }).join('')}</select>`;
       else if (f.type === 'number') h += `<label class="${f.req ? 'req' : ''}" for="f_${f.k}">${esc(t(f.label))}</label><div class="unit"><input type="number" id="f_${f.k}" name="f_${f.k}" min="${f.k === 'qt' || /^pot(Rec|Gui)Qt$/.test(f.k) ? f.min || 1 : 0}" max="99999" oninput="if (this.value.replace(/\D/g, '').length > 5) this.value = this.value.slice(0, this.value.length - 1)" ${f.dec ? 'step="0.1" inputmode="decimal"' : 'inputmode="numeric"'} value="${esc(val == null ? '' : val)}">${f.unit ? `<em>${f.unit}</em>` : ''}</div>${f.soft ? `<span class="hint">${esc(tf('Gamme du configurateur : {min} à {max} mm. Au-delà : à étudier par Ferplay.', { min: fmt(f.min), max: fmt(f.max) }))}</span>` : ''}`;
       else if (f.type === 'text') h += `<label class="${f.req ? 'req' : ''}" for="f_${f.k}">${esc(t(f.label))}</label><input type="text" id="f_${f.k}" name="f_${f.k}" value="${esc(val || '')}">`;
@@ -4944,7 +4973,11 @@ function gotoMissing() {
   if (i >= 0) { startEdit(i); editing.touched = true; renderEditor(); const { errors } = validateProduct(CAT[editing.v.code], editing.v.f); if (errors.length) focusField(errors[0].k); return; }
   if (!S.products.length) { $('btnAdd').scrollIntoView({ block: 'center' }); $('btnAdd').focus(); }
 }
+// 05/11/2026 (feedback interno): as escolhas facultativas (finição) desmarcam-se ao voltar a clicar na opção já escolhida
+document.addEventListener('mousedown', e => { const l = e.target.closest && (e.target.closest('input[data-desel]') || (e.target.closest('label.opt') || {}).querySelector && e.target.closest('label.opt').querySelector('input[data-desel]')); if (l) l.dataset.was = l.checked ? '1' : ''; });
 document.addEventListener('click', e => {
+  const rd = e.target.closest && e.target.closest('input[type=radio][data-desel]');
+  if (rd && e.target === rd && rd.dataset.was === '1' && typeof editing !== 'undefined' && editing) { rd.checked = false; rd.dataset.was = ''; delete editing.v.f[rd.name.slice(2)]; renderEditor(); renderStatus(); save(); return; }
   if (e.target.closest('[data-savebtn]')) { e.preventDefault(); $('btnSave').click(); return; }
   const g = e.target.closest('[data-goto]'); if (g) { e.preventDefault(); focusField(g.dataset.goto); }
   const gc = e.target.closest('[data-gotoc]'); if (gc) { e.preventDefault(); clientTouched = true; renderStatus(); focusClient(gc.dataset.gotoc); }
