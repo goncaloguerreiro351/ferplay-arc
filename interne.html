@@ -112,6 +112,7 @@ header.top > div:last-child { order: 2; flex: 1 1 320px; min-width: 0 }
 .pdfhead{margin-bottom:8px}.pdfcard{margin:8px 0}.pdflog{margin:6px 0 0 18px;padding:0;font-size:13px}.pdflog .src{color:var(--muted)}
 #pdfBtn{flex:0 0 auto;white-space:nowrap;padding:8px 16px;border:0;border-radius:8px;background:var(--accent);color:#fff;font-weight:700;cursor:pointer;line-height:1.2}
 #errSide { position: fixed; right: 10px; top: 110px; width: 210px; max-height: 65vh; overflow: auto; z-index: 20; background: var(--surface); border: 1px solid var(--bad); border-radius: 10px; padding: 8px 10px; font-size: 13px; box-shadow: 0 4px 14px rgba(0,0,0,.14) }
+#errSide.okp { border-color: var(--ok, #2e8b57) } #errSide.okp button { display: block; width: 100%; margin-top: 6px; padding: 8px 10px; font-weight: 700 }
 #errSide button.goto { display: block; width: 100%; text-align: left; margin: 4px 0 0; padding: 5px 8px }
 @media (max-width: 1280px) { #errSide { top: auto; bottom: 10px; right: 10px; left: 10px; width: auto; max-height: 28vh } #errSide button.goto { display: inline-block; width: auto; margin-right: 4px } }
 </style>
@@ -1700,6 +1701,14 @@ viewBox="0 0 17206.5 4581.43"
 // [pt, en]
 const I18N_SRC = {
   // cabeçalho, faixas, estado
+  'Options – remplissage et tôles': ['Opções – enchimentos e chapas', 'Options – infill and sheet'],
+  'Options – serrures et gâches': ['Opções – fechaduras e gáches', 'Options – locks and strikes'],
+  'Options – ventouses': ['Opções – ventosas', 'Options – magnetic locks'],
+  'Options – verrous': ['Opções – ferrolhos', 'Options – bolts'],
+  'Options – pompiers': ['Opções – bombeiros', 'Options – fire service'],
+  'Options – poignées et câbles': ['Opções – puxadores e cabos', 'Options – handles and cables'],
+  'Options – accessoires et équipements': ['Opções – acessórios e equipamentos', 'Options – accessories and equipment'],
+  'Platine pour gonds': ['Platina para gonzos', 'Hinge plate'],
   'Importer un PDF': ['Importar PDF', 'Import PDF'],
   'devis du Chiffreur : pré-remplit le formulaire (rien ne quitte cet ordinateur).': ['orçamento do Chiffreur: pré-preenche o formulário (nada sai deste computador).', 'Chiffreur quote: pre-fills the form (nothing leaves this computer).'],
   'Ce PDF n’est pas un devis du Chiffreur (en-tête « DEVIS : … » introuvable). Les modèles des clients ne sont pas encore reliés : remplissez à la main.': ['Este PDF não é um orçamento do Chiffreur (cabeçalho « DEVIS : … » não encontrado). Os modelos dos clientes ainda não estão ligados: preencha à mão.', 'This PDF is not a Chiffreur quote (« DEVIS : … » header not found). Client templates are not connected yet: fill in by hand.'],
@@ -3005,7 +3014,7 @@ const isVentouse = o => /Ventouse 300kg/i.test(o.label);
 
 // Lista de campos visíveis para um modelo e os valores atuais
 // versão interna (22/10/2026): cor e acabamento (couleur, RAL, finition, traitement) não são obrigatórios
-const INTERNE_OPC = ['fixPot', 'potSec', 'coul', 'ralAutre', 'fin', 'trait', 'ral', 'sens', 'galvaLaq', 'm_marque', 'm_modele', 'pose'];   // 03/11/2026: o tipo de pose também é facultativo no interno   // 'sens' = sentido de abertura
+const INTERNE_OPC = ['fixPot', 'potSec', 'serMan', 'typeserrure', 'coul', 'ralAutre', 'fin', 'trait', 'ral', 'sens', 'galvaLaq', 'm_marque', 'm_modele', 'pose'];   // 03/11/2026: o tipo de pose também é facultativo no interno   // 'sens' = sentido de abertura
 function fieldsFor(m, v) {
   const F = fieldsForAll(m, v);
   if (INTERNE) for (const f of F) if (f.req && INTERNE_OPC.includes(f.k)) { f.req = false; f.autoOk = true; }
@@ -3066,6 +3075,10 @@ function fieldsForAll(m, v) {
   }
   if (m.potindus) add({ k: 'potindus', sec: 'Poteaux', label: 'Poteaux', type: 'radio', opts: ['Avec poteaux', 'Sans poteaux'], req: true });
   if (m.potca5) add({ k: 'potca5', sec: 'Poteaux', label: 'Poteaux', type: 'radio', opts: [['sans', 'Sans poteaux'], ['150', 'Poteaux 150×150'], ['200', 'Poteaux 200×200']], req: true });   // 27/10/2026 (decisões 10 e 48): 150×150 e 200×200 (ou sem poteaux) sempre selecionáveis de 3 a 8 m, sem o bloqueio dos 150 acima de 5 m
+  // 05/11/2026 (feedback interno): «Sans poteaux» → opção «Platine pour gonds», pré-selecionada mas alterável (vai para as Observations)
+  { const semPot = ['battant', 'portillon'].includes(m.kind) && (v0.potindus === 'Sans poteaux' || v0.potca5 === 'sans');
+    if (semPot) { if (v0.platGonds === undefined) v0.platGonds = true; add({ k: 'platGonds', sec: 'Poteaux', label: 'Platine pour gonds', type: 'check' }); }
+    else if (v0.platGonds !== undefined) delete v0.platGonds; }
   // 03/11/2026 (testes internos do Ferro): com poteaux/portique escolhidos pergunta-se sempre a fixação (à visser / à sceller) e a trappe de visite
   const SG = ['Simple', 'Portique'];
   const hasPotApp = ['battant', 'coulissant', 'autoportant', 'portillon'].includes(m.kind) && (v.potindus === 'Avec poteaux' || v.potca5 === '150' || v.potca5 === '200' || SG.includes(v.guidage) || SG.includes(v.reception));
@@ -3157,13 +3170,26 @@ function fieldsForAll(m, v) {
     if (v.coul === '__autre') add({ k: 'ralAutre', sec: 'Finition', label: 'Référence RAL', type: 'text', req: true, hint: t('Attention, voir la disponibilité du RAL hors standard avec l’usine.'), hintRed: true });
   }
   // --- opções
-  for (const o of (m.options || []).filter(o => o.choix)) add({ k: 'o' + o.id, sec: 'Options – remplissage et habillage', label: o.label, type: 'select', opts: [['', 'Aucun'], ...o.choix], wide: true });
-  for (const o of (m.options || []).filter(o => !o.choix)) {
-    add({ k: 'o' + o.id, sec: 'Options – équipements', label: o.label, type: 'check' });
-    if (/modulec/i.test(o.label) && v['o' + o.id]) add({ k: 'o' + o.id + 't', sec: 'Options – équipements', label: 'Gâche électrique : type', type: 'radio', opts: ['À émission', 'À rupture'], req: true });
-    if (isVentouse(o) && v['o' + o.id]) add({ k: 'ventouseQt', sec: 'Options – équipements', label: 'Nombre de ventouses', type: 'number', req: true, min: 1, max: 6, hard: true });
+  // 05/11/2026 (feedback interno): as opções vêm agrupadas por tipo, como no ARC (remplissage e tôles / serrures e fermetures / acessórios e equipamentos)
+  const OPT_SEC = ['Options – remplissage et tôles', 'Options – serrures et gâches', 'Options – ventouses', 'Options – verrous', 'Options – pompiers', 'Options – poignées et câbles', 'Options – accessoires et équipements'];
+  const optSec = o => { const l = o.label;
+    if (/pompier/i.test(l)) return OPT_SEC[4];
+    if (/ventouse|réservation|douchette/i.test(l)) return OPT_SEC[2];
+    if (/verrou/i.test(l)) return OPT_SEC[3];
+    if (/poignée|bâton|câble/i.test(l)) return OPT_SEC[5];
+    if (/serrure|gâche|modulec/i.test(l)) return OPT_SEC[1];
+    if (o.choix || /panneau|t[ôo]l|lisse|traverse|chapeau|fers de lance|motif|habillage|rosace|cache vue|ossature|grillag|remplissage|barreaud/i.test(l)) return OPT_SEC[0];
+    return OPT_SEC[6]; };
+  const optList = (m.options || []).map((o, i) => ({ o, i, s: optSec(o) })).sort((a, b) => OPT_SEC.indexOf(a.s) - OPT_SEC.indexOf(b.s) || (!!b.o.choix - !!a.o.choix) || a.i - b.i);
+  for (const { o, s } of optList) {
+    if (o.choix) { add({ k: 'o' + o.id, sec: s, label: o.label, type: 'select', opts: [['', 'Aucun'], ...o.choix], wide: true }); continue; }
+    add({ k: 'o' + o.id, sec: s, label: o.label, type: 'check' });
+    if (/modulec/i.test(o.label) && v['o' + o.id]) add({ k: 'o' + o.id + 't', sec: s, label: 'Gâche électrique : type', type: 'radio', opts: ['À émission', 'À rupture'], req: true });
+    if (isVentouse(o) && v['o' + o.id]) add({ k: 'ventouseQt', sec: s, label: 'Nombre de ventouses', type: 'number', req: true, min: 1, max: 6, hard: true });
   }
-  if ((m.options || []).some(o => /pivot roulement/i.test(o.label) && v['o' + o.id])) add({ k: 'pivFix', sec: 'Options – équipements', label: 'Pivots : fixation', type: 'radio', opts: ['À visser', 'À sceller'], req: true });   // 03/11/2026 (testes internos)
+  // 05/11/2026 (feedback interno): o A49C (e Collectif A49C) leva sempre pivot sur roulement à billes (de série): pergunta-se a fixação, facultativa
+  const pivStd = /^(INSMVAAC|COVAAC)$/.test(m.code);
+  if (pivStd || (m.options || []).some(o => /pivot roulement/i.test(o.label) && v['o' + o.id])) add({ k: 'pivFix', sec: 'Options – accessoires et équipements', label: 'Pivots : fixation', type: 'radio', opts: ['À visser', 'À sceller'], req: !pivStd });   // 03/11/2026 (testes internos)   // 03/11/2026 (testes internos)
   // 05/11/2026 (feedback interno): portões com chapa (tôle): finição facultativa texturado / mat (vai para as Observations)
   if ((m.options || []).some(o => /t[ôo]l/i.test(o.label) && !/prot/i.test(o.label) && v['o' + o.id])) add({ k: 'finTole', sec: 'Finitions', label: 'Finition de la tôle', type: 'radio', opts: ['Texturé', 'Mat'], req: false });
   add({ k: 'obs', sec: 'Observations', label: 'Observations pour ce produit (demandes particulières, modifications…)', type: 'textarea' });
@@ -4709,6 +4735,7 @@ function productPdfIn(p) {
     if (m.vantaux) P.vantaux = v.vantaux;   // decisão 11: 2v / tierce / mono
     if (ouv === 'motorise' && v.m_src === 'ferplay' && v.m_app) P.kit = String(v.m_app).split(' – ')[0];   // decisão 14: kit do tarif → MODEL no ARC
     if (v.finTole) P.horsArc.push(t('Finition de la tôle') + ' : ' + t(v.finTole));
+    if (v.platGonds) P.horsArc.push(t('Platine pour gonds'));
     P.rail = v.rail === 'sem' ? undefined : v.rail;
     if (v.rail === 'sem') P.horsArc.push(t('Rail au sol') + ' : ' + t('Sans guide au sol'));
     if (v.crem) P.crem = /nylon/i.test(v.crem) ? 'nylon' : (/acier/i.test(v.crem) ? 'acier' : undefined);
@@ -4738,6 +4765,7 @@ function productPdfIn(p) {
   const arcKind = m.kind === 'autoportant' ? 'coulissant' : m.kind;
   const ARCBOX = { battant: ['serrCode', 'serrElec', 'dcyl', 'pompier', 'ventLoc', 'roue', 'bavolet'], portillon: ['serrCode', 'serrElec', 'dcyl', 'pompier', 'antipanique', 'tole1m', 'venus', 'baton', 'cable', 'bavolet'], coulissant: ['serrCode', 'dcyl', 'pompier', 'pmi', 'coffreM', 'bavolet', 'verrouSol'] };
   const flag = (k, full, val) => { if ((ARCBOX[arcKind] || []).includes(k)) A[k] = val || true; else P.horsArc.push(full); };
+  if (/^(INSMVAAC|COVAAC)$/.test(m.code)) { A.roulBilles = true; if (v.pivFix) A.pivFix = v.pivFix === 'À sceller' ? 'sceller' : 'visser'; }   // 05/11/2026: pivot sur roulement à billes de série no A49C
   for (const o of m.options || []) {
     const val = v['o' + o.id]; if (!val) continue;
     const lab = o.label.toLowerCase();
@@ -4926,7 +4954,7 @@ function renderEditor() {
     let cur = '';
     for (const f of F) {
       if (auto.has(f.k)) continue;
-      if (f.sec !== cur) { if (cur) h += '</div>'; h += `<p class="sub">${esc(t(f.sec))}</p><div class="grid${/équipements/.test(f.sec) ? ' cards' : ''}">`; cur = f.sec; }
+      if (f.sec !== cur) { if (cur) h += '</div>'; h += `<p class="sub">${esc(t(f.sec))}</p><div class="grid${/équipements|serrures|ventouses|verrous|pompiers|poignées/.test(f.sec) ? ' cards' : ''}">`; cur = f.sec; }
       const val = vv[f.k];
       const errMsg = editing.touched && eK.get(f.k);
       const cls = 'f' + (errMsg ? ' has-err' : '') + (wK.get(f.k) ? ' has-wrn' : '') + ((['radio', 'qty', 'textarea', 'info'].includes(f.type) || f.wide) ? ' full' : '') + (f.type === 'check' ? ' ckcard' + (val ? ' on' : '') : '');
@@ -4993,7 +5021,13 @@ function editorChange(e) {
 // 05/11/2026 (feedback interno): painel lateral fixo com os campos em falta; cada um leva ao campo
 function renderErrSide(errors) {
   const el = document.getElementById('errSide'); if (!el) return;
-  if (!errors || !errors.length) { el.hidden = true; el.innerHTML = ''; return; }
+  if (!errors || !errors.length) {
+    // 05/11/2026 (feedback interno): com o produto completo, o painel lateral oferece ir direto a «Enregistrer»
+    if (typeof editing !== 'undefined' && editing && editing.v && editing.v.code) { el.hidden = false; el.classList.add('okp'); el.innerHTML = `<b>✓ ${t('Produit complet.')}</b><button type="button" class="primary" data-savebtn>${t('Enregistrer le produit')}</button>`; }
+    else { el.hidden = true; el.innerHTML = ''; }
+    return;
+  }
+  el.classList.remove('okp');
   el.hidden = false;
   el.innerHTML = `<b>${t('À compléter :')} ${errors.length}</b>` + errors.map(e => `<button type="button" class="goto" data-goto="${esc(e.k)}">${esc(e.ui)}</button>`).join('');
 }
@@ -5030,6 +5064,7 @@ function gotoMissing() {
   if (!S.products.length) { $('btnAdd').scrollIntoView({ block: 'center' }); $('btnAdd').focus(); }
 }
 document.addEventListener('click', e => {
+  if (e.target.closest('[data-savebtn]')) { e.preventDefault(); $('btnSave').click(); return; }
   const g = e.target.closest('[data-goto]'); if (g) { e.preventDefault(); focusField(g.dataset.goto); }
   const gc = e.target.closest('[data-gotoc]'); if (gc) { e.preventDefault(); clientTouched = true; renderStatus(); focusClient(gc.dataset.gotoc); }
 });
@@ -5548,6 +5583,12 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
       }
       if (!changed) break;
     }
+    // 05/11/2026: sem menção à fechadura no devis: motorizado / motorizável = sem fechadura; manual = com fechadura (para não bloquear; a Sónia pode alterar)
+    { const ov = String(v.ouv || (m.kind === 'portillon' ? 'manuel' : '')), motor = /motoris/i.test(ov), manual = /manuel/i.test(ov), F2 = fieldsFor(m, v);
+      if (motor || manual) {
+        if (F2.some(f => f.k === 'serPort') && !v.serPort) setv('serPort', motor ? 'sans' : 'avec', 'défaut : ' + (motor ? 'motorisé = sans serrure' : 'manuel = avec serrure'));
+        if (F2.some(f => f.k === 'serYN') && !v.serYN) setv('serYN', motor ? 'Non' : 'Oui', 'défaut : ' + (motor ? 'motorisé = sans serrure' : 'manuel = avec serrure'));
+      } }
     // secção dos poteaux de guidage/réception («simple 100x100»): campo potSec (Industriel) ou secção do alumínio
     const pg = pairs.find(p => /^poteaux? de (guidage|reception)/.test(nz(p.key)) && /\d{2,3}\s*x\s*\d{2,3}/.test(p.val));
     if (pg && !v.potSec) { const mm = pg.val.match(/(\d{2,3})\s*x\s*\1/i); if (mm) { const F = fieldsFor(m, v); const f = F.find(x => x.k === 'potSec'); if (f && optList(f).some(o => String(o[0]).startsWith(mm[1]))) { const o = optList(f).find(o => String(o[0]).startsWith(mm[1])); setv('potSec', o[0], pg.key + ' : ' + pg.val); } } }
