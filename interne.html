@@ -111,10 +111,11 @@ header.top > div:last-child { order: 2; flex: 1 1 320px; min-width: 0 }
 .pdfpanel{border:1px solid var(--line);border-radius:10px;padding:12px;margin:10px 0;background:var(--surface)}
 .pdfhead{margin-bottom:8px}.pdfcard{margin:8px 0}.pdflog{margin:6px 0 0 18px;padding:0;font-size:13px}.pdflog .src{color:var(--muted)}
 #pdfBtn{flex:0 0 auto;white-space:nowrap;padding:8px 16px;border:0;border-radius:8px;background:var(--accent);color:#fff;font-weight:700;cursor:pointer;line-height:1.2}
-#errSide { position: fixed; right: 10px; top: 110px; width: 210px; max-height: 65vh; overflow: auto; z-index: 20; background: var(--surface); border: 1px solid var(--bad); border-radius: 10px; padding: 8px 10px; font-size: 13px; box-shadow: 0 4px 14px rgba(0,0,0,.14) }
+#errSide { position: fixed; left: 12px; bottom: 12px; width: fit-content; max-width: min(360px, calc(100vw - 190px)); max-height: 40vh; overflow: auto; z-index: 20; background: var(--surface); border: 1px solid var(--bad); border-radius: 14px; padding: 8px 12px; font-size: 13px; box-shadow: 0 4px 14px rgba(0,0,0,.18) }
+#saveFloat { position: fixed; right: 14px; bottom: 14px; z-index: 21; padding: 11px 18px; border-radius: 12px; font-weight: 700; box-shadow: 0 4px 14px rgba(0,0,0,.25) }
 #errSide.okp { border-color: var(--ok, #2e8b57) } #errSide.okp button { display: block; width: 100%; margin-top: 6px; padding: 8px 10px; font-weight: 700 }
 #errSide button.goto { display: block; width: 100%; text-align: left; margin: 4px 0 0; padding: 5px 8px }
-@media (max-width: 1280px) { #errSide { top: auto; bottom: 10px; right: 10px; left: 10px; width: auto; max-height: 28vh } #errSide button.goto { display: inline-block; width: auto; margin-right: 4px } }
+@media (max-width: 760px) { #errSide { max-width: calc(100vw - 24px); bottom: 70px } }
 </style>
 </head>
 <body>
@@ -193,6 +194,7 @@ viewBox="0 0 17206.5 4581.43"
       <div class="f" data-c="ref"><label class="req" for="c_ref">Référence client / chantier</label><input type="text" id="c_ref"></div>
       <div class="f" data-c="ncde"><label for="c_ncde">Nº Votre CDE</label><input type="text" id="c_ncde" maxlength="8"><span class="hint">Facultatif.</span></div>
       <div class="f" data-c="norc" hidden><label for="c_norc">Nº du devis</label><input type="text" id="c_norc" maxlength="30"><span class="hint">Facultatif : si vous avez demandé un devis avant cette commande.</span></div>
+      <div class="f" data-c="norcInt" hidden><label for="c_norcInt">Nº du devis interne</label><input type="text" id="c_norcInt" maxlength="30"><span class="hint">Version interne : référence du devis Ferplay (ex. A26-MR0154). Facultatif.</span></div>
       <div class="f" data-c="drec" hidden><label for="c_drec">Date de réception</label><input type="date" id="c_drec"><span class="hint">Version interne : date de réception de la commande (aujourd’hui par défaut ; modifiable si l’ARC est fait plus tard).</span></div>
     </div>
     <p class="sub">Contact</p>
@@ -383,8 +385,19 @@ viewBox="0 0 17206.5 4581.43"
     }
     return bs >= 0.5 ? best : null;
   }
-  const HFIXRE = [[/obturateur/i, /^GOND OBTURATEUR/], [/gond avec cache/i, /^GONDS (HAUTS )?AVEC CACHE(-GONDS)? \(STANDARD\)|^GONDS AVEC CACHE/], [/3 points.*cache/i, /GONDS 3 POINTS A VISSER AVEC CACHE|^GONDS HAUTS AVEC CACHE-GONDS$/],
-    [/3 points/i, /^GONDS 3 POINTS A VISSER HAUT ET BAS/], [/multir.glage/i, /GONDS (BAS )?MULTIREGLAGE/], [/sceller/i, /^GONDS A SCELLER/], [/crapaudine/i, /^CRAPAUDINE/], [/simples d.port/i, /^\u0000$/], [/paumelle/i, /MONTAGE SUR PAUMELLES/]];   // 27/10/2026: «paumelles simples déportées» sem caixa → Observations
+  // 05/11/2026 (Gonçalo): cada fixação marca a sua caixa (sem ir para as Observations): 3 pontos (com ou sem cache-gonds) → «GONDS 3 POINTS À VISSER HAUT ET BAS» (ou «AVEC CACHE-GONDS» onde existe);
+  // «Standard : gonds multiréglage à visser haut et bas» → «GONDS MULTIRÉGLAGE À VISSER HAUT ET BAS»; as duas caixas standard do Village (haut com cache-gonds / bas multiréglage) têm opção própria
+  const HFIXRE = [[/hauts? avec cache.gonds.*standard/i, /^GONDS HAUTS AVEC CACHE-GONDS \(STANDARD\)/], [/bas multir.glage.*standard/i, /^GONDS BAS MULTIREGLAGE A VISSER \(STANDARD\)/],
+    [/obturateur/i, /^GOND OBTURATEUR/], [/gond avec cache/i, /^GONDS (HAUTS )?AVEC CACHE(-GONDS)? \(STANDARD\)|^GONDS AVEC CACHE/],
+    [/3 points.*cache/i, /^GONDS 3 POINTS A VISSER AVEC CACHE-GONDS$|^GONDS 3 POINTS A VISSER HAUT ET BAS$/], [/3 points/i, /^GONDS 3 POINTS A VISSER HAUT ET BAS/],
+    [/multir.glage.*haut et bas/i, /^GONDS MULTIREGLAGE A VISSER HAUT ET BAS( \(STANDARD\))?$/], [/multir.glage/i, /GONDS (BAS )?MULTIREGLAGE/], [/sceller/i, /^GONDS A SCELLER/], [/crapaudine/i, /^CRAPAUDINE/],
+    [/paumelle/i, /MONTAGE SUR PAUMELLES/]];
+  // 05/11/2026 (Gonçalo): blocos «NON CONCERNÉ» também nos ARCs Ferro Habitat (quadros lidos dos PDFs; [x0, y0, x1, y1] a partir do topo, em pontos)
+  const FERHAB_ZONES = {
+    'CONF CDE FER - BATTANT - HABITAT': { motorisation: [27, 425, 293, 478], poteaux: [303, 455, 570, 514], grille: [303, 621, 570, 696] },
+    'CONF CDE FER - COULISSANT - HABITAT': { motorisation: [30, 474, 297, 541], poteaux: [303, 376, 570, 490], grille: [303, 553, 570, 629] },
+    'CONF CDE FER - PORTILLON - HABITAT': { poteaux: [303, 439, 570, 500], grille: [303, 681, 570, 759] }
+  };
   // poses do Chiffreur: 7 e 8 = «Standard : 90° entre piliers» com pivots (Saphir, Yères…)
   const HPOSERE = { 1: /^90/, 2: /^180. ARRIERE/, 3: /^180. ENTRE/, 4: /^OUVERTURE VERS L/, 5: /^OUVERTURE SUR PENTE/, 6: /^90/, 7: /^90/, 8: /^90/ };
   const HMOTIF = { 'Arbuste': 'ARBUSTE', 'Oiseau': "VOL D'OISEAU", 'Flame': 'FLAME', 'Eau gazeuse': 'EAU GAZEUSE', 'Ligne verticale': 'LIGNE VERTICALE', 'Rond vide (d: 100mm)': 'ROND VIDE Ø100 mm', 'Carré vide (100mm)': 'CARRE VIDE Ø100 mm', 'Demi lune': 'DEMI LUNE' };
@@ -1326,7 +1339,9 @@ viewBox="0 0 17206.5 4581.43"
       const max = f.getMaxLength();
       // 22/10/2026: tudo o que é preenchido vai em maiúsculas, menos as Observations
       // não cortar o texto: se o campo do PDF tiver limite de caracteres, tira-se o limite
-      let s = ansi(/Observations$/.test(name) ? String(val) : String(val).toUpperCase()); if (max && s.length > max) f.setMaxLength(undefined);
+      // 05/11/2026 (Gonçalo): toda a escrita do ARC em maiúsculas, Observations incluídas; nos campos de RAL só o número (o ARC já diz «RAL :»)
+      let v0 = String(val); if (/RAL/.test(name)) v0 = v0.replace(/^\s*RAL\s*[:\-]?\s*/i, '');
+      let s = ansi(v0.toUpperCase()); if (max && s.length > max) f.setMaxLength(undefined);
       f.setText(s);
       if (!f.acroField.getDefaultAppearance()) f.acroField.setDefaultAppearance(`/Helv ${size || 9} Tf 0 g`);
       // campo de várias linhas com o conteúdo numa linha só (ex.: «Client» dos garde-corps): trata-se como os outros
@@ -1388,7 +1403,7 @@ viewBox="0 0 17206.5 4581.43"
     // depois texto corrido separado por « | » até «min» pt. As linhas são quebradas aqui (o pdf-lib deixava palavras sair pela direita).
     const fitField = (name, parts, max, mid, min) => {
       if (!parts.length || !has(name)) return;
-      if (name !== 'Observations') parts = parts.map(x => String(x).toUpperCase());   // maiúsculas (menos Observations)
+      parts = parts.map(x => String(x).toUpperCase());   // maiúsculas (05/11/2026: também nas Observations)
       const f = form.getTextField(name); f.enableMultiline();
       const r = f.acroField.getWidgets()[0].getRectangle(), w = r.width - 8;
       const wrap = (s, sz) => s.split('\n').flatMap(par => {
@@ -1416,10 +1431,10 @@ viewBox="0 0 17206.5 4581.43"
     // 03/11/2026 (testes internos): com vários produtos no mesmo PDF, o Nº de encomenda leva uma letra (A, B, C…) em cada ARC, para se ver que são produtos da mesma encomenda
     const letraArc = n => { let s = ''; for (n = n + 1; n > 0; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(65 + (n - 1) % 26) + s; return s; };
     if (client.ncde) txt('Nº CMD', client.ncde + (total > 1 ? letraArc(idx - 1) : ''));
-    txt('REF CLIENT', client.ref + (total > 1 ? `  (${idx}/${total})` : ''));
+    txt('REF CLIENT', client.ref);   // 05/11/2026: sem «(1/2)»: a letra no Nº de encomenda (A, B…) já o diz
     txt('SOCIETE', client.societe);
     // cabeçalho dos ARCs LDG
-    txt('CLIENT', [client.societe, client.contactNom].filter(Boolean).join(' – '), 8); txt('TELEPHONE', client.tel); txt('REF-CLIENT', client.ref + (total > 1 ? `  (${idx}/${total})` : ''));
+    txt('CLIENT', [client.societe, client.contactNom].filter(Boolean).join(' – '), 8); txt('TELEPHONE', client.tel); txt('REF-CLIENT', client.ref);
     fitField('ADRESSE LIVRAISON', addr, 10, 6, 4.5);   // 03/11/2026 (testes internos): morada em letra maior (até 10 pt; encolhe só se não couber)
     const obsLines = [];
     if (client.livraison === 'chantier') markAt(H0.chantier);
@@ -1488,7 +1503,7 @@ viewBox="0 0 17206.5 4581.43"
           box(P.potFix === 'sceller' ? 'potS' : 'potV', !!P.potFix);
         }
         box('trappes', P.trappe);
-        box(P.potFix === 'sceller' ? 'gondsS' : 'gondsV', !!P.potFix && !P.pivots);   // 28/10/2026 (Alu Industriel): com pivots sur roulement à billes (ALU49c, ALU49 > 8 m) não se marcam os gonds
+        // 05/11/2026: os gonds só se marcam quando o pedido os diz (a fixação dos poteaux não é a dos gonds)   // 28/10/2026 (Alu Industriel): com pivots sur roulement à billes (ALU49c, ALU49 > 8 m) não se marcam os gonds
         box('pattes', P.premontage); box('palpeur', P.premPalpeur);
         if (A.roulBilles) box((A.pivFix || P.potFix) === 'visser' ? 'pivV' : 'pivS');   // 03/11/2026: o cliente escolhe a fixação dos pivots (À visser / À sceller)   // tarif 2026: pivot à roulement à billes «à sceller» (série) se o cliente não escolheu
         box('releveur', A.pente); box('verrou', A.verrou); box('douchette', A.douchette);
@@ -1535,7 +1550,7 @@ viewBox="0 0 17206.5 4581.43"
     const opts = [...obsLines, ...(FI ? [] : (P.horsArc || []))];
     const obsTxt = [
       socCut ? tr('Société') + ' : ' + client.societe : '',   // 05/11/2026: nunca perder o nome da empresa
-      client.typeDoc === 'commande' && client.norc ? tr('Devis') + ' ' + tr('Nº') + ' ' + client.norc : '',   // 05/11/2026 (Sónia): Nº do orçamento no topo das observações
+      [client.norc ? tr('Devis Chiffreur') + ' ' + tr('Nº') + ' ' + client.norc : '', client.norcInt ? tr('Devis interne') + ' ' + tr('Nº') + ' ' + client.norcInt : ''].filter(Boolean).join(' – '),   // 05/11/2026: Nº do orçamento Chiffreur e interno no topo das observações
       !FI && P.surMesure && P.tpl !== 'REGIONALE-SM' ? 'RÉGIONALE SUR MESURE' : '',
       p.obs,
       opts.length ? (P.surMesure ? '' : tr('Options') + ' : ') + opts.join(' ; ') : '',
@@ -1573,7 +1588,12 @@ viewBox="0 0 17206.5 4581.43"
     const isCl = v.kind === 'cloture';
     if (FI) { /* ficha dinâmica: só o que se aplica, nada a cinzento */ }
     else if (SN) grey.push(...stdGrey);
-    else if (P.tpl) { /* Habitat: sem blocos a cinzento por agora */ }
+    else if (P.tpl && FERHAB_ZONES[P.tpl] && !P.pieces) {   // Ferro Habitat: motorização (se não é motorizado), poteaux (se não há) e grelha (se não é clôture)
+      const Z = FERHAB_ZONES[P.tpl], hasMot = P.ouv === 'motorisée' || !!P.kitLabel || !!P.motClient, hasPot = !!(P.potS || P.potG === 'POTEAU' || P.potG === 'PORTIQUE' || P.potR === 'POTEAU' || P.potR === 'PORTIQUE');
+      if (isCl) { if (Z.motorisation) grey.push(Z.motorisation); if (Z.poteaux) grey.push(Z.poteaux); }
+      else { if (Z.grille) grey.push(Z.grille); if (Z.motorisation && !hasMot) grey.push(Z.motorisation); if (Z.poteaux && !hasPot) grey.push(Z.poteaux); }
+    }
+    else if (P.tpl) { /* Alu Habitat: sem blocos a cinzento por agora */ }
     else if (isCl) grey.push(...Object.keys(T.zones).filter(z => z !== 'grille'));
     else {
       grey.push('grille');
@@ -3055,7 +3075,8 @@ function fieldsForAll(m, v) {
   // --- dimensões
   if (m.kind === 'cloture') {
     if (m.gamme === 'st') {
-      add({ k: 'H', sec: 'Dimensions', label: 'Hauteur', type: 'select', opts: m.H.map(h => [h, fmt(h) + ' mm']), req: true });
+      add({ k: 'H', sec: 'Dimensions', label: 'Hauteur', type: 'select', opts: [...m.H.map(h => [h, fmt(h) + ' mm']), ['__autre', 'Autre cote (hors standard : à étudier par Ferplay)']], req: true });   // 05/11/2026 (Gonçalo): clôtures standard também aceitam outra cota
+      if (v0.H === '__autre') add({ k: 'Hx', sec: 'Dimensions', label: 'Hauteur (autre cote)', type: 'number', unit: 'mm', req: true, min: 500, max: 4000, hard: true });
       // 27/10/2026 (decisão 12): menos de 10 painéis aceita-se com aviso «+10 %» (antes bloqueava)
       add({ k: 'qt', sec: 'Dimensions', label: 'Nombre de panneaux', type: 'number', req: true, min: 1, max: 9999, hard: true, hint: m.qtymin ? tf('À partir de {n} panneaux ; en dessous : plus-value de 10 %.', { n: m.qtymin }) : '' });
     } else {
@@ -3066,7 +3087,7 @@ function fieldsForAll(m, v) {
   } else {
     const LL = m.kind === 'battant' || m.kind === 'portillon' ? 'Largeur entre piliers' : 'Largeur de passage';
     if (m.fixed) {
-      const ac = isSerieAC(m), AUTRE = ['__autre', 'Autre cote (hors standard : plus-value de 15 %)'];
+      const ac = true, AUTRE = ['__autre', isSerieAC(m) ? 'Autre cote (hors standard : plus-value de 15 %)' : 'Autre cote (hors standard : à étudier par Ferplay)'];   // 05/11/2026 (Gonçalo): todas as cotas fixas aceitam «autre cote» (à étudier), para o cliente não se sentir bloqueado
       add({ k: 'H', sec: 'Dimensions', label: 'Hauteur', type: 'select', opts: [...m.H.map(h => [h, fmt(h) + ' mm']), ...(ac ? [AUTRE] : [])], req: true });
       if (ac && v0.H === '__autre') add({ k: 'Hx', sec: 'Dimensions', label: 'Hauteur (autre cote)', type: 'number', unit: 'mm', req: true, min: 500, max: 4000, hard: true });
       const bad = (m.invalid && v.H && m.invalid[v.H]) || [];
@@ -3276,8 +3297,11 @@ function habFinitions(m, coul) {
 const _habPoses = {};
 function habPoses(m) {
   const base = HABR(m.rec.poses) || [];
-  if (!/^HAALCO(FL|PG)/.test(m.rcode) || !['battant', 'portillon'].includes(m.kind)) return base;
-  if (!_habPoses[m.code]) _habPoses[m.code] = base.map(p => String(p.id) === '1' ? { ...p, fixations: [...p.fixations, { id: 20, titre: 'Gond obturateur de jour (pour portail plein)', H4: 100 }] } : p);
+  if (m.famille !== 'alu-habitat' || !['battant', 'portillon'].includes(m.kind)) return base;
+  // 05/11/2026 (Gonçalo): na pose standard as duas fixações «standard» do ARC (gonds hauts avec cache-gonds / gond bas multiréglage à visser) também se podem escolher
+  if (!_habPoses[m.code]) _habPoses[m.code] = base.map(p => String(p.id) === '1' ? { ...p, fixations: [...p.fixations,
+    ...(/^HAALCO(FL|PG)/.test(m.rcode) ? [{ id: 20, titre: 'Gond obturateur de jour (pour portail plein)', H4: 100 }] : []),
+    { id: 'S1', titre: 'Gonds hauts avec cache-gonds (standard)' }, { id: 'S2', titre: 'Gond bas multiréglage à visser (standard)' }] } : p);
   return _habPoses[m.code];
 }
 const habPose = (m, v) => habPoses(m).find(p => String(p.id) === String(v.pose));
@@ -3671,9 +3695,9 @@ function fieldsHab(m, v) {
       // H + 90 em todos os tipos, H + 130 com lisse défensive (igual ao Industriel; confirmado 03/11/2026)
       const mainS = ['100/100', '120/120', '150/150', '200/200'], secsF = [...mainS.filter(x => pt.sections.includes(x)), ...pt.sections.filter(x => !mainS.includes(x))];
       add({ k: 'potSec', sec, label: 'Section des poteaux', type: 'select', opts: secsF.map(x => [x, x]), req: true });
-      { const base = Number(v.H) || 0, dl = v.fo_ld ? 130 : 90;
+      { const base = Number(v.H) || 0, dl = (v.fo_ld ? 130 : 90) + (v.potFix === 'sceller' ? 500 : 0);   // 05/11/2026: à sceller soma 500 mm de chumbamento (como no Industriel)
         if (base) { const sug = String(base + dl); if (!v.potH || v.potH === v.potHSug) v.potH = sug; v.potHSug = sug; } else if (v.potH && v.potH === v.potHSug) { delete v.potH; delete v.potHSug; }
-        add({ k: 'potH', sec, label: 'Hauteur des poteaux (au sol)', type: 'number', unit: 'mm', req: false, min: 0, max: 9999, hard: true, hint: base ? tf('Suggestion automatique : hauteur + {d} mm ; vous pouvez la modifier.', { d: dl }) : '' }); }
+        add({ k: 'potH', sec, label: 'Hauteur des poteaux', type: 'number', unit: 'mm', req: false, min: 0, max: 9999, hard: true, hint: base ? tf('Suggestion automatique : hauteur + {d} mm ; vous pouvez la modifier.', { d: dl }) : '' }); }
       // quantidade e posição de cada poteau: o ARC não tem caixas para isto, vão para as Observations
       for (const [k, lab, oris] of [['potS', 'Poteaux de soutien', null], ['potG', 'Poteau de guidage', [['EXTERIEUR', 'Extérieur'], ['INTERIEUR', 'Intérieur']]], ['potR', 'Poteau de réception', [['FRONTAL', 'Frontal'], ['LATERAL', 'Latéral']]]]) {
         if (v[k] === 'POTEAU') {
@@ -4625,7 +4649,7 @@ function validateProduct(m, v) {
     const vE = effV(v), L = Number(vE.L) || 0, H = Number(vE.H) || 0, ouvM = m.ouv.length === 1 ? m.ouv[0] : v.ouv;
     const warn = (k, s, ui) => warnings.push({ k, msg: s, ui: ui || t(s) });
     // 27/10/2026 (decisão 13): cotas «autre cote» nas séries A/C
-    if (isSerieAC(m) && (v.L === '__autre' || v.H === '__autre')) warn(v.L === '__autre' ? 'L' : 'H', 'Cote hors standard : plus-value de 15 % sur la cote supérieure');
+    if (m.fixed && (v.L === '__autre' || v.H === '__autre')) warn(v.L === '__autre' ? 'L' : 'H', isSerieAC(m) ? 'Cote hors standard : plus-value de 15 % sur la cote supérieure' : 'Cote hors standard : à étudier par Ferplay');
     // decisão 12: clôtures standard com menos de 10 painéis
     if (m.kind === 'cloture' && m.gamme === 'st' && m.qtymin && Number(v.qt) > 0 && Number(v.qt) < m.qtymin) warn('qt', 'Moins de 10 panneaux : plus-value de 10 %');
     // decisão 6: A45 coulissant > 16 m e autoporté > 12 m: aviso (nunca bloqueia, também em motorizado/motorisable)
@@ -4871,7 +4895,7 @@ function productPdfIn(p) {
 
 // ======================= cliente =======================
 const CLIENT_REQ = INTERNE ? ['typeDoc', 'societe', 'ref', 'adresse', 'livraison'] : ['typeDoc', 'societe', 'ref', 'contactNom', 'tel', 'email', 'rue', 'cp', 'ville', 'livraison'];
-const CLIENT_KEYS = ['societe', 'ref', 'ncde', 'norc', 'drec', 'contactNom', 'tel', 'email', 'livrNom', 'adresse', 'rue', 'cp', 'ville', 'gps'];
+const CLIENT_KEYS = ['societe', 'ref', 'ncde', 'norc', 'norcInt', 'drec', 'contactNom', 'tel', 'email', 'livrNom', 'adresse', 'rue', 'cp', 'ville', 'gps'];
 const CLIENT_LABEL = { typeDoc: 'Type de demande', societe: 'Société', ref: 'Référence client / chantier', contactNom: 'Nom du contact', tel: 'Téléphone', email: 'E-mail', rue: 'Adresse de livraison', adresse: 'Adresse de livraison', cp: 'Code postal', ville: 'Ville', livraison: 'Transport' };
 function readClient() {
   const c = {};
@@ -5020,9 +5044,10 @@ function editorChange(e) {
   if (t.dataset.qty) { const qk = t.dataset.qk || 'm_acc'; v.f[qk] = v.f[qk] || {}; v.f[qk][t.dataset.qty] = Number(t.value) || 0; save(); return; }
   const n = t.name || t.id; if (!n) return;
   if (n === 'e_type') {   // 05/11/2026: Complet / Pièces — mudar de tipo recomeça as respostas do produto
+    const keepFiche = v.fiche && v.fiche !== 'pieces' ? v.fiche : (t.value === 'complet' ? 'industriel' : null);   // 05/11/2026: a Fiche escolhida mantém-se ao mudar de Complet para Peças (e vice-versa)
     v.type = t.value; v.f = {}; v.indef = false;
     for (const x of ['fiche', 'gamme', 'kind', 'groupe', 'code']) delete v[x];
-    if (t.value === 'complet') v.fiche = 'industriel';
+    if (keepFiche) v.fiche = keepFiche;
     renderEditor(); save(); return;
   }
   if (n.startsWith('e_')) {
@@ -5050,12 +5075,9 @@ function editorChange(e) {
 // 05/11/2026 (feedback interno): painel lateral fixo com os campos em falta; cada um leva ao campo
 function renderErrSide(errors) {
   const el = document.getElementById('errSide'); if (!el) return;
-  if (!errors || !errors.length) {
-    // 05/11/2026 (feedback interno): com o produto completo, o painel lateral oferece ir direto a «Enregistrer»
-    if (typeof editing !== 'undefined' && editing && editing.v && editing.v.code) { el.hidden = false; el.classList.add('okp'); el.innerHTML = `<b>✓ ${t('Produit complet.')}</b><button type="button" class="primary" data-savebtn>${t('Enregistrer le produit')}</button>`; }
-    else { el.hidden = true; el.innerHTML = ''; }
-    return;
-  }
+  // 05/11/2026 (Gonçalo): «Enregistrer le produit» flutuante em baixo à direita, só com a edição de um produto aberta
+  const sf = document.getElementById('saveFloat'); if (sf) sf.hidden = !(typeof editing !== 'undefined' && editing && editing.v && editing.v.code);
+  if (!errors || !errors.length) { el.hidden = true; el.innerHTML = ''; return; }
   el.classList.remove('okp');
   el.hidden = false;
   el.innerHTML = `<b>${t('À compléter :')} ${errors.length}</b>` + errors.map(e => `<button type="button" class="goto" data-goto="${esc(e.k)}">${esc(e.ui)}</button>`).join('');
@@ -5269,7 +5291,7 @@ function renderStatus() {
   $('btnGoto').hidden = !(ce.length || bad || editErr || !S.products.length || (editing && !editing.v.code));
   markClient(ce);
 }
-function syncNorc() { const el = document.querySelector('#secClient [data-c="norc"]'), r = document.querySelector('input[name="c_typeDoc"]:checked'); if (el) el.hidden = !(r && r.value === 'commande'); }   // 05/11/2026 (Sónia): Nº do orçamento só em «Confirmation de commande»
+function syncNorc() { const el = document.querySelector('#secClient [data-c="norc"]'), r = document.querySelector('input[name="c_typeDoc"]:checked'); if (el) el.hidden = !(r && r.value === 'commande'); const ei = document.querySelector('#secClient [data-c="norcInt"]'); if (ei) ei.hidden = !(INTERNE && r && r.value === 'commande'); }   // 05/11/2026 (Sónia): Nº do orçamento só em «Confirmation de commande»
 function renderAll() {
   syncNorc();
   if (generated && Object.keys(generated).length) { const sn = snapshot(); for (const k of Object.keys(generated)) if (generated[k].snap !== sn) delete generated[k]; }
@@ -5373,6 +5395,7 @@ setLang(lang0);
 if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdit(Number(location.hash.slice(5)) || 0); if (location.hash.endsWith('x')) gotoMissing(); }
 </script>
 <aside id="errSide" hidden aria-label="À compléter"></aside>
+<button type="button" id="saveFloat" class="primary" data-savebtn hidden>Enregistrer le produit</button>
 <script>/**
  * @licstart The following is the entire license notice for the
  * JavaScript code in this page
@@ -5720,8 +5743,11 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
   function apply(res, clientOnly) {
     const d = res.devis;
     const sel = clientOnly ? [] : [...document.querySelectorAll('#pdfPanel [data-pi]')].filter(c => c.checked).map(c => res.products[+c.dataset.pi]);
-    const c = readClient();
-    // 05/11/2026: preenche os dados do cliente que o devis traz (só campos vazios; a Sónia pode alterar)
+    // 05/11/2026 (Gonçalo): importar um PDF recomeça a página do zero: apaga o que lá estava (cliente e produtos) e mete só a informação do PDF
+    const c0 = readClient(), c = {}; for (const k of CLIENT_KEYS) c[k] = ''; c.drec = c0.drec; c.typeDoc = 'commande'; c.livraison = '';
+    S.products.length = 0;
+    if (d.refChiffreur) c.norcInt = d.refChiffreur;
+    if (d.refInt) c.norcInt = d.refInt;   // referência do orçamento Ferplay citada pelo cliente (perfis de outros clientes)   // referência interna do devis (ex. A26-MR0154): na versão interna fica ao lado do Nº do devis do Chiffreur
     if (!c.tel && d.tel) c.tel = d.tel;
     if (!c.email && d.email) c.email = d.email;
     if (!c.ncde && d.ncde && String(d.ncde).length <= 8) c.ncde = d.ncde;   // o campo do ARC só cabe 8 caracteres
@@ -5769,6 +5795,597 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
   }
   window.PdfImport = { readLines, parseDevis, parseBlock, findModel, fillProduct, finishProd, analyse, apply, initUI, nz, toks };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => initUI()); else initUI();
+})();
+</script>
+<script>// Importar PDF — perfis por cliente (05/11/2026). Só na página interna. Sem IA: regras e dicionário técnico.
+// Cada perfil sabe (1) reconhecer o documento do cliente, (2) onde estão os dados do cliente (société, morada de entrega, telefone, e-mail,
+// contacto, referência da obra, nº de encomenda do cliente) e (3) onde estão os produtos. O produto passa depois pelo mesmo casamento com o
+// catálogo e o mesmo preenchimento dos campos que o importador do Chiffreur. O que não se reconhece NUNCA se inventa: fica por completar
+// ou na lista «não percebido». Os preços não entram.
+(function () {
+  'use strict';
+  const nz = s => String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const compact = s => nz(s).replace(/\s+/g, '');
+  const PRICE_TAIL = /\s+\d{1,3}(?:[ .]\d{3})*,\d{2}(?:\s+\d{1,3}(?:[ .]\d{3})*,\d{2})*\s*€?$/;
+
+  // ---------------------------------------------------------------- medidas e dicionário técnico
+  // 4M00 → 4000 · 1m50 → 1500 · 5.00m → 5000 · «3 540 mm» → 3540 · 4000 → 4000
+  function mmOf(s) {
+    s = String(s || '').trim();
+    let m = s.match(/^(\d+)\s*m\s*(\d{1,2})\b/i); if (m) return Number(m[1]) * 1000 + Number(m[2].padEnd(2, '0')) * 10;
+    m = s.match(/^(\d+)[.,](\d{1,2})\s*m\b/i); if (m) return Math.round(parseFloat(m[1] + '.' + m[2]) * 1000);
+    m = s.match(/^(\d+)\s*m\b/i); if (m) return Number(m[1]) * 1000;
+    m = s.replace(/[\s.]/g, '').match(/^(\d{3,5})(mm)?/i); if (m) return Number(m[1]);
+    return 0;
+  }
+  const RAL_RE = /ral\s*:?\s*(\d{4})|\b(?:vert|gris|blanc|noir|bleu|brun|rouge|jaune|beige|marron)\w*\s+(\d{4})\b/i;
+  const ralOf = s => { const m = String(s || '').match(RAL_RE); return m ? (m[1] || m[2]) : ''; };
+  const KIND_RE = [[/autoportant/, 'autoportant'], [/coulissant|coulis\b/, 'coulissant'], [/portillon/, 'portillon'], [/cl[oô]ture|cloture/, 'cloture'], [/pivotant|battant|vantaux|vantail|vtx/, 'battant']];
+  function kindOf(s) { const t = nz(s); for (const [re, k] of KIND_RE) if (re.test(t)) return k; return ''; }
+  const MODEL_IND = /\b(A49C|A49|A45|A25|A100|A120|A160|C120|C150|C200|CA5|S37)\b/;
+
+  // texto corrido numa ou várias linhas → campos técnicos
+  function freeText(raw) {
+    const t = String(raw || ''), n = ' ' + nz(t) + ' ', c = compact(t), o = {};
+    o.kind = kindOf(t);
+    const mi = t.toUpperCase().match(MODEL_IND); if (mi) o.ind = mi[1];
+    let m = t.match(/(\d{3,5})\s*[xX×]\s*(\d{3,5})/); if (m) { o.L = Number(m[1]); o.H = Number(m[2]); }
+    m = t.match(/\bL\s*([\d.,]+)\s*m\s*x\s*H\s*([\d.,]+)\s*m/i); if (m) { o.L = mmOf(m[1] + 'm'); o.H = mmOf(m[2] + 'm'); }
+    m = t.match(/\bL\s*([\d.,]+)\s*m\b[^\d]{0,12}([\d.,]+)\s*m\b/i); if (!o.L && m) { o.L = mmOf(m[1] + 'm'); o.H = mmOf(m[2] + 'm'); }
+    const ral = ralOf(t); if (ral) o.ral = ral;
+    if (/sur platines?|piles sur platine|poteaux? sur platine/.test(n)) o.fixPot = 'visser'; else if (/a sceller/.test(n)) o.fixPot = 'sceller';
+    m = n.match(/poteaux? (?:sur platines? )?(\d{2,3}) ?x ?(\d{2,3})/) || n.match(/poteaux? (?:de )?(\d{2,3}) ?x ?(\d{2,3})/); if (m && m[1] === m[2]) o.potSec = m[1];
+    if (/sans trappe/.test(n)) o.trappe = false; else if (/(avec|compris) trappe|trappe de visite/.test(n)) o.trappe = true;
+    if (/sans serrure/.test(n) || /sansserrure/.test(c)) o.serrure = false; else if (/serrure/.test(n)) o.serrure = true;
+    m = n.match(/(poussant|tirant) (droit|gauche)/); if (m) o.sens = m[1][0].toUpperCase() + m[1].slice(1) + ' ' + m[2];
+    if (/2 vantaux|2 vtx|deux vantaux|double battant/.test(n)) o.vantaux = '2v'; else if (/monovantail|1 vantail|mono vantail/.test(n)) o.vantaux = 'mono';
+    if (/motorisable/.test(n)) o.ouv = 'motorisable'; else if (/motoris/.test(n)) o.ouv = 'motorise'; else if (/manuel/.test(n)) o.ouv = 'manuel';
+    return o;
+  }
+
+  // ---------------------------------------------------------------- catálogo
+  function resolve(spec) {
+    const C = Object.entries(CAT);
+    if (spec.hab) { const k = C.find(([, m]) => m.hab && nz(m.label) === nz(spec.hab) && (!spec.kind || m.kind === spec.kind)); if (k) return { code: k[0], label: spec.hab, kind: k[1].kind, tried: 1 }; }
+    if (spec.ind) {
+      const c = C.filter(([, m]) => !m.hab && !m.alu && nz(m.label) === nz(spec.ind) && (!spec.kind || m.kind === spec.kind));
+      const pref = spec.collectif ? { co: 0, st: 1, sm: 2 } : { st: 0, sm: 1, co: 2 };
+      c.sort((a, b) => (pref[a[1].gamme] ?? 9) - (pref[b[1].gamme] ?? 9));
+      if (c.length) return { code: c[0][0], label: spec.ind, kind: c[0][1].kind, tried: c.length };
+    }
+    return { code: '', label: spec.hab || spec.ind || '', kind: spec.kind || '', tried: 0 };
+  }
+
+  // ---------------------------------------------------------------- spec → produto analisado
+  function buildProduct(spec, I, notes) {
+    const pairs = [], flags = (spec.flags || []).slice(), bullets = [], options = (spec.options || []).slice();
+    const add = (k, v) => { if (v !== undefined && v !== null && v !== '') pairs.push({ key: k, val: String(v), section: 'main' }); };
+    if (spec.prod) { for (const p of spec.prod.pairs) pairs.push(p); flags.push(...spec.prod.flags); bullets.push(...spec.prod.bullets); options.push(...spec.prod.options); }
+    const has = re => pairs.some(p => re.test(nz(p.key)));
+    if (spec.L && !has(/^largeur/)) add(spec.hab ? 'Largeur entre piliers' : 'Largeur entre poteaux', spec.L + 'mm');
+    if (spec.H && !has(/^hauteur/)) add(spec.hab ? 'Hauteur sous chapeaux' : 'Hauteur totale', spec.H + 'mm');
+    if (spec.sens && !has(/^sens/)) add("Sens d'ouverture (vue de l'extérieur)", spec.sens);
+    if (spec.ouv && !has(/^type d ouverture/)) add("Type d'ouverture", { manuel: 'Ouverture manuelle', motorisable: 'Ouverture motorisable', motorise: 'Ouverture motorisée' }[spec.ouv]);
+    if (spec.ral && !has(/^couleur/)) add('Couleur', 'RAL ' + spec.ral);
+    if (spec.fin && !has(/^finition/)) add('Finition', spec.fin);
+    if (spec.trappe !== undefined && !has(/^trappe/)) add('Trappe de visite', spec.trappe ? 'Oui' : 'Non');
+    if (spec.fixPot) flags.push('Poteaux' + (spec.potSec ? ' ' + spec.potSec + 'x' + spec.potSec : '') + ' : ' + (spec.fixPot === 'visser' ? 'Sur platine' : 'À sceller'));
+    else if (spec.potSec) flags.push('Poteaux ' + spec.potSec + 'x' + spec.potSec);
+    const kindLine = spec.kindLine || ({ battant: 'Portail 2 Vantaux', coulissant: 'Portail Coulissant', autoportant: 'Portail autoportant', portillon: 'Portillon', cloture: 'Clôture' }[spec.kind] || '');
+    const prod = { head: spec.head || spec.label || '', kindLine, pairs, flags, bullets, options, raw: spec.raw || '' };
+    const mm = resolve(spec);
+    let ap;
+    if (mm.code) {
+      ap = I.finishProd(prod, mm);
+      const m = CAT[mm.code];
+      const setIf = (k, val, src) => { if (val === undefined) return; const F = fieldsFor(m, ap.v); if (F.some(f => f.k === k) && (ap.v[k] === undefined || ap.v[k] === '')) { ap.v[k] = val; ap.log.push({ field: k, value: String(val), src }); } };
+      if (spec.serrure !== undefined) { setIf('serPort', spec.serrure ? 'avec' : 'sans', spec.serSrc || 'texte do pedido'); setIf('serYN', spec.serrure ? 'Oui' : 'Non', spec.serSrc || 'texte do pedido'); }
+      if (spec.vantaux) setIf('vantaux', spec.vantaux, spec.head);
+      if (spec.qt && Number(spec.qt) > 0) { ap.v.qt = String(spec.qt); }
+      for (const x of spec.setByLabel || []) {
+        const F = fieldsFor(m, ap.v), f = F.find(f => x.re.test(f.label || '') && (f.opts || []).some(o => String(Array.isArray(o) ? o[0] : o).toLowerCase() === String(x.val).toLowerCase() || String(Array.isArray(o) ? o[1] : o).toLowerCase() === String(x.val).toLowerCase()));
+        if (f && (ap.v[f.k] === undefined || ap.v[f.k] === '')) { const o = f.opts.find(o => String(Array.isArray(o) ? o[0] : o).toLowerCase() === String(x.val).toLowerCase() || String(Array.isArray(o) ? o[1] : o).toLowerCase() === String(x.val).toLowerCase()); ap.v[f.k] = Array.isArray(o) ? o[0] : o; ap.log.push({ field: f.k, value: String(x.val), src: x.src }); }
+      }
+      if (spec.obs && spec.obs.length) { const F = fieldsFor(m, ap.v); if (F.some(f => f.k === 'obs')) ap.v.obs = [ap.v.obs, ...spec.obs].filter(Boolean).join('\n'); }
+      // 05/11/2026 (Gonçalo): cotas fora do standard. Se o campo aceita «autre cote» (__autre), a medida lida vai para Hx / Lx e fica «à étudier par Ferplay»
+      for (const [k, val, lab] of [['H', spec.H, 'Hauteur'], ['L', spec.L, 'Largeur']]) {
+        if (!val || (ap.v[k] !== undefined && ap.v[k] !== '')) continue;
+        const f = fieldsFor(m, ap.v).find(x => x.k === k && x.type === 'select');
+        if (f && (f.opts || []).some(o => String(Array.isArray(o) ? o[0] : o) === '__autre')) {
+          ap.v[k] = '__autre'; ap.v[k + 'x'] = String(val);
+          ap.log.push({ field: k, value: val + ' mm (autre cote, hors standard)', src: (spec.src && spec.src[k]) || 'medida do pedido' });
+          ap.left = ap.left.filter(x => !new RegExp('^' + lab + ' ').test(x));
+        }
+      }
+      // medidas lidas que o catálogo não aceita (fora dos valores do modelo): mostram-se, não se forçam
+      if (spec.L && !ap.v.L) ap.left.push('Largeur : ' + spec.L + ' mm (valeur absente des choix du modèle)');
+      if (spec.H && !ap.v.H) ap.left.push('Hauteur : ' + spec.H + ' mm (valeur absente des choix du modèle)');
+      const errs = validateProduct(m, ap.v).errors; ap.missing = errs.map(e => e.ui || e.msg);
+    } else {
+      // sem modelo: guarda-se o que foi lido para a Sónia escolher só o modelo no editor
+      const v = { qt: String(spec.qt || 1) }, log = [];
+      const put = (k, val, src) => { if (val !== undefined && val !== '' && val !== null) { v[k] = val; log.push({ field: k, value: String(val), src }); } };
+      put('L', spec.L ? String(spec.L) : '', spec.src && spec.src.L); put('H', spec.H ? String(spec.H) : '', spec.src && spec.src.H);
+      put('sens', spec.sens, spec.src && spec.src.sens); if (spec.ral) put('coul', 'RAL' + spec.ral, spec.src && spec.src.ral);
+      if (spec.ouv) put('ouv', spec.ouv, spec.src && spec.src.ouv);
+      if (spec.fixPot) put('fixPot', spec.fixPot === 'visser' ? 'À visser' : 'À sceller', spec.src && spec.src.fixPot);
+      if (spec.obs && spec.obs.length) v.obs = spec.obs.join('\n');
+      ap = { head: prod.head, kindLine, model: mm, code: '', mat: spec.mat || 'fer', fiche: spec.hab ? 'habitat' : 'industriel', v, log, left: [], missing: [], raw: prod.raw, partial: { mat: spec.mat || 'fer', fiche: spec.hab ? 'habitat' : 'industriel', kind: spec.kind } };
+      ap.left = (spec.left || []).slice();
+    }
+    ap.notes = (spec.notes || []).concat(notes || []);
+    if (spec.left && mm.code) ap.left = ap.left.concat(spec.left);
+    ap.head = spec.title || ap.head;
+    return ap;
+  }
+
+  // blocos copiados do Chiffreur («Modèle Industriel : A120» …): reutiliza o analisador do Chiffreur
+  function copiedBlocks(T, I, opt) {
+    const specs = [], starts = [];
+    T.forEach((s, i) => {
+      let m = s.match(/Mod[èe]le (Industriel|Collectif)\s*:\s*([A-Za-z0-9.]+)/i);
+      if (m) { starts.push({ i, type: m[1], label: m[2], pre: s.slice(0, m.index).replace(/[\s-]+$/, '') }); return; }
+      if (/\bMODELE\b/.test(s) && /^[A-Z]\d{2,3}[A-Z]?$/.test((T[i + 1] || '').trim())) starts.push({ i, label: T[i + 1].trim(), type: 'Industriel', pre: s, skip: 1 });
+    });
+    starts.forEach((st, k) => {
+      const nextI = k + 1 < starts.length ? starts[k + 1].i : T.length;
+      let e = nextI;
+      for (let j = st.i + 1; j < nextI; j++) if (opt.end.test(T[j])) { e = j; break; }
+      const body = T.slice(st.i + 1 + (st.skip || 0), e).map(x => x.replace(/^FE\/\S+\s*/, '').replace(/^(?:•\s*)?/, m => m)).filter(x => x && !/^FE\/\S+$/.test(x));
+      const kl = [st.pre, body.find(x => /^(Portail|Portillon|P ?o ?r ?t ?i ?l|Cl[ôo]ture)/i.test(x.replace(/\s/g, '')) || /^P o rtillo n/.test(x)) || ''].join(' ');
+      const kindTxt = kindOf(kl) || (/portillon/.test(compact(body.slice(0, 2).join(''))) ? 'portillon' : '');
+      const kindLine = ({ battant: 'Portail 2 Vantaux', coulissant: 'Portail Coulissant', autoportant: 'Portail autoportant', portillon: 'Portillon', cloture: 'Clôture' }[kindTxt] || '');
+      const lines = ['Modèle ' + st.type + ' : ' + st.label, kindLine, ...body.filter(x => !/^P o rtillo n$/.test(x))];
+      const prod = I.parseBlock(lines);
+      const sp = { prod, ind: st.label, kind: kindTxt, collectif: /collectif/i.test(st.type), head: 'Modèle ' + st.type + ' : ' + st.label, title: 'Modèle ' + st.type + ' : ' + st.label + (kindLine ? ' · ' + kindLine : ''), raw: lines.join('\n') };
+      const all = compact(body.join(' '));
+      if (/sansserrure/.test(all)) { sp.serrure = false; sp.serSrc = 'texte « sans serrure »'; }
+      if (/plusvalue.*poteausurplatine|poteausurplatine/.test(all)) sp.fixPot = 'visser';
+      specs.push(sp);
+    });
+    return specs;
+  }
+
+  // ---------------------------------------------------------------- utilitários de leitura
+  const col = (line, x0, x1) => (line && line.items ? line.items.filter(i => i.x >= x0 && i.x < x1).map(i => i.s).join(' ').replace(/\s+/g, ' ').trim() : '');
+  const EMAIL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)*?\.(?:com|fr|net|org|eu|pt|be|de|es|it|ch)/;
+  const PHONE = /(?:\+|00)?\d[\d .]{8,16}\d/;
+  const findIdx = (L, re, from) => { for (let i = from || 0; i < L.length; i++) if (re.test(L[i].text)) return i; return -1; };
+  const firstEmail = (T, bad) => { for (const s of T) { const m = s.match(EMAIL); if (m && !(bad && bad.test(m[0]))) return m[0]; } return ''; };
+  const isPhone = s => /^\+?[\d .]{9,18}$/.test(s) && (s.replace(/\D/g, '').length >= 9);
+  const unique = a => [...new Set(a.filter(Boolean))];
+
+  // ---------------------------------------------------------------- perfis
+  const PROFILES = [];
+
+  // CHIFFREUR — página web «devis/voir» impressa do browser (Ctrl+P → PDF), antes de gerar o orçamento oficial. Muitos clientes enviam isto.
+  // O texto é o mesmo do orçamento do Chiffreur, com colunas de preço à frente e ruído do browser: põe-se no formato do PDF do Chiffreur e usa-se o mesmo analisador.
+  PROFILES.push({
+    id: 'chiffreurweb', name: 'Chiffreur (página impressa do browser)',
+    match: c => /chiffreur-portails\.ferplay\.net|G[ée]n[ée]rer le fichier PDF pour le client/i.test(c.all) && /^Devis n/m.test(c.all),
+    parse(c) {
+      const raw = c.L.map(l => l.text).filter(Boolean);
+      const noise = s => /^https?:\/\/chiffreur/i.test(s) || /^\d{2}\/\d{2}\/\d{4},? \d{2}:\d{2}/.test(s) || /^\s*\d+(?:\.\d{2})?(?:\s+\d+(?:\.\d{2})?)*\s*$/.test(s);
+      const strip = s => s.replace(/(\s+\d+\.\d{2})(\s+\d+(?:\.\d{2})?){0,2}\s*$/, '');
+      const T = raw.filter(s => !noise(s)).map(strip);
+      const id = T.findIndex(s => /^Devis n/i.test(s)), num = ((T[id] || '').match(/(\d{2}-\d+)/) || [])[1] || '';
+      let it = T.findIndex((s, i) => i > id && /^Tel\s*:?/i.test(s)); if (it < 0) it = id + 6;
+      const blk = T.slice(id + 1, it).filter(s => s && !/^Le \d/.test(s));
+      const ic = T.findIndex(s => /^R[ée]f[ée]rence chantier/i.test(s)), ii = T.findIndex((s, i) => i > ic && /^R[ée]f[ée]rence interne/i.test(s)), idl = T.findIndex((s, i) => i > ic && /^D[ée]lai/i.test(s));
+      const between = (a, b) => (a >= 0 ? T.slice(a + 1, b > a ? b : a + 2) : []).filter(s => s && !/^R[ée]f[ée]rence|^D[ée]lai|^Condition|^Validit/i.test(s))[0] || '';
+      const chantier = (T[ic] || '').replace(/^R[ée]f[ée]rence chantier\s*:?\s*/i, '').trim() || between(ic, ii > ic ? ii : idl);
+      const interne = ii >= 0 ? ((T[ii] || '').replace(/^R[ée]f[ée]rence interne\s*:?\s*/i, '').trim() || between(ii, idl)) : '';
+      const hd = T.map((s, i) => /^(Mod[èe]le (Industriel|Collectif)\s*:|Habitat\s*>)/i.test(s) ? i : -1).filter(i => i >= 0);
+      const end = T.findIndex((s, i) => i > (hd[0] || 0) && /^(Sous total HT|Zone de saisie|Transport$)/i.test(s));
+      const prodLines = [];
+      T.slice(hd[0] || 0, end > 0 ? end : T.length).forEach((s, i) => { if (i > 0 && /^(Mod[èe]le (Industriel|Collectif)\s*:|Habitat\s*>)/i.test(s)) prodLines.push('Total HT 0.00'); prodLines.push(s); });
+      prodLines.push('Total HT 0.00');
+      const synth = ['DEVIS: ' + (blk[0] || '') + ' / ' + num, 'Référence Devis: ' + num, ...blk, 'FERPLAY', 'Tel : ', 'Référence chantier ' + chantier, 'Délai', ...prodLines].map(t => ({ text: t }));
+      const d = window.PdfImport.parseDevis(synth);
+      d.profile = 'chiffreurweb'; d.fromProfile = true; d.profileName = this.name; d.refInt = interne; d.isChiffreur = true; d.chantier = chantier;
+      const products = d.products.map(p => c.I.finishProd(p));
+      return { full: { devis: d, products, lines: c.L } };
+    },
+  });
+
+  // La Boutique du Portail (4M) — configurador com «Opção : 1;»
+  PROFILES.push({
+    id: 'boutique', name: 'La Boutique du Portail',
+    match: c => /Configuration - Portail/i.test(c.all) && /laboutiqueduportail|La Boutique du Portail/i.test(c.all),
+    parse(c) {
+      const L = c.L, ih = findIdx(L, /^Adresses de livraison et facturation/), ir = findIdx(L, /^R[ée]f\. de commande/);
+      const rows = L.slice(ih + 1, ir > ih ? ir : ih + 9);
+      const left = rows.map(l => col(l, 0, 150)).filter(Boolean), right = rows.map(l => col(l, 150, 999)).filter(Boolean);
+      const rr = unique(right).filter(s => !/^FR\d{8,}$/.test(s)), phones = rr.filter(isPhone), rest = rr.filter(s => !isPhone(s));
+      const o = { societe: left[0] || '', contact: rest[0] || '', address: rest.slice(1), tel: phones[0] || '', email: firstEmail(c.T), ref: '', ncde: '', quote: '' };
+      const im = L[ir + 1] && L[ir + 1].text.match(/^(\d+)\s+(\d{2}\/\d{2}\/\d{4})\s+(.*)$/); if (im) { o.ncde = im[1]; o.transport = im[3]; }
+      // produto
+      const ic = findIdx(L, /^Configuration - Portail/);
+      const sp = { src: {} }; let heading = '';
+      for (const l of L.slice(ic + 1)) {
+        const s = l.text;
+        if (/^(Une version|La Boutique|Pour toute|T[ée]l\.|803|FR0|Powered|LIVRAISON|\d{2}\/\d{2}\/\d{4}|#LI)/.test(s)) continue;
+        const m = s.match(/^(.+?)\s*:\s*(\d+);?$/);
+        if (!m) { if (!/:/.test(s)) heading = s; continue; }
+        const key = m[1].trim(), h = nz(heading);
+        if (/^(hauteur|largeur)/i.test(key)) { const v = Number(m[2]); if (/hauteur/i.test(key)) { sp.H = v; sp.src.H = s; } else { sp.L = v; sp.src.L = s; } continue; }
+        if (/type de portail/.test(h)) { sp.kind = kindOf(key); }
+        else if (/sens/.test(h)) { const t = nz(key); const dr = /droit/.test(t) ? 'droit' : (/gauche/.test(t) ? 'gauche' : ''); if (dr) { sp.sens = (/interieur/.test(t) ? 'Tirant ' : 'Poussant ') + dr; sp.src.sens = s + ' (déduit : ouverture ' + (/interieur/.test(t) ? 'intérieure = tirant' : 'extérieure = poussant') + ')'; } }
+        else if (/remplissage/.test(h)) { const mm = key.match(/\b(A\d{2})\b/); if (mm) { sp.hab = mm[1]; sp.head = key; } else sp.left = (sp.left || []).concat('Remplissage : ' + key); }
+        else if (/couleur/.test(h)) { const r = ralOf(key); if (r) { sp.ral = r; sp.src.ral = s; } }
+        else if (/finition/.test(h)) { sp.fin = key; }
+      }
+      sp.title = 'Portail ' + (sp.hab || '') + ' · ' + (sp.kind || ''); sp.mat = 'fer';
+      sp.notes = ['Fiche Habitat Ferro ' + (sp.hab || '')];
+      return { client: o, specs: [sp] };
+    },
+  });
+
+  // BOIS EXPO
+  PROFILES.push({
+    id: 'boisexpo', name: 'Bois Expo',
+    match: c => /BOIS EXPO/i.test(c.all) && /Commande\s+Page/.test(c.all),
+    parse(c) {
+      const L = c.L, T = c.T, i0 = findIdx(L, /^Adresse de livraison souhait/);
+      const addr = T.slice(i0 + 1, i0 + 5).filter(s => !/^Plateforme/i.test(s));
+      const tel = (T.find(s => /^T[ée]l\./.test(s)) || '').replace(/^T[ée]l\.\s*/, '').replace(/\s*\d{4}-\d{3}.*$/, '').trim();
+      const ih = findIdx(L, /^Date Num[ée]ro pi[èe]ce/), row = (T[ih + 1] || '').match(/^(\d{2}\/\d{2}\/\d{4})\s+(\d+)\s+(\S+)\s+(.*?)\s+(\S+@?\S*)$/) || [];
+      const o = { societe: addr[1] || addr[0] || '', address: addr.slice(2), tel, email: firstEmail(T), ref: (row[4] || '').trim(), contact: row[5] || '', ncde: row[2] || '' };
+      // produto: da linha «PORTILLON …» até à cláusula
+      const ip = findIdx(L, /^(PORTILLON|PORTAIL)/i), ie = findIdx(L, /^Aucune clause/);
+      const blk = T.slice(ip, ie > ip ? ie : ip + 12), txt = blk.join(' ');
+      const sp = freeText(txt); sp.head = blk[0]; sp.title = blk[0].replace(PRICE_TAIL, '').replace(/\s+\S+\s+[\d, ]+$/, '');
+      const m = txt.match(/HT\s*(\d[Mm]\d*)\s*[xX]\s*(\d[Mm]\d*)\b/i); if (m) { sp.H = mmOf(m[1]); sp.L = mmOf(m[2]); sp.src = { H: blk[0], L: blk[0] }; }
+      sp.kind = sp.kind || 'portillon'; sp.potSec = (txt.match(/Poteaux\s*(\d{2,3})x\1/i) || [])[1]; if (/2 poteaux/i.test(txt) && /sceller/i.test(txt)) sp.fixPot = 'sceller';
+      sp.serSrc = 'serrure à canon européen'; sp.flags = [];
+      sp.src = Object.assign({ sens: blk.join(' / '), ral: blk.join(' / '), fixPot: '2 poteaux à sceller', ouv: 'portillon' }, sp.src || {});
+      sp.ouv = 'manuel'; sp.notes = ['Modèle « thermo » : à choisir'];
+      return { client: o, specs: [sp] };
+    },
+  });
+
+  // Sage «Commande» (CADO, CPL, REZO): cabeçalho com o cliente, tabela «Code article … Description»
+  const sageParse = (c, who) => {
+    const L = c.L, T = c.T;
+    const head = T.findIndex(s => /^FERPLAY|^SARL FERPLAY|^FERPLAY FABRICA/i.test(s));
+    const o = { ref: '', ncde: '', contact: '', tel: '', email: firstEmail(T, /ferplay/i) };
+    if (who === 'cado') {
+      o.societe = 'CADO'; o.tel = ((T.find(s => /^T[ée]l\s*:/.test(s)) || '').replace(/^T[ée]l\s*:\s*/, '')).trim();
+      const i = findIdx(L, /^Adresse de livraison/), r = L.slice(i + 1, i + 5).map(l => col(l, 0, 200)).filter(Boolean);
+      o.address = r; o.ref = ((T.find(s => /^R[ée]f[ée]rence\s*:/.test(s)) || '').replace(/^R[ée]f[ée]rence\s*:\s*/, '')).trim();
+      o.ncde = (T.find(s => /^Num[ée]ro\s*:/.test(s)) || '').replace(/^Num[ée]ro\s*:\s*/, '').trim();
+    } else {
+      o.societe = T[0]; const ih = T.findIndex(s => /^(FERPLAY|SARL FERPLAY)/i.test(s)); o.address = T.slice(1, 4).filter(s => !/^T[ée]l|^Fax|^Site|^Mail/.test(s));
+      o.tel = ((T.find(s => /^T[ée]l\s*:/.test(s)) || '').replace(/^T[ée]l\s*:\s*/, '')).trim();
+      const ic = T.findIndex(s => /^Commande$/.test(s)); o.ncde = (T[ic + 1] || '').trim();
+      if (/^(Num[ée]ro|Commande)$/.test(o.ncde)) o.ncde = '';
+    }
+    return o;
+  };
+  PROFILES.push({
+    id: 'cado', name: 'CADO',
+    match: c => /cadouest\.com/i.test(c.all),
+    parse(c) {
+      const o = sageParse(c, 'cado'), T = c.T;
+      const specs = copiedBlocks(T, c.I, { end: /^(Siret|Code article|Transport|TRANSPORT)/ });
+      const ip = T.findIndex(s => /Mod[èe]le (Industriel|Collectif)/.test(s));
+      // opções (linhas «Options :») que o Chiffreur coloca depois
+      return { client: o, specs };
+    },
+  });
+  PROFILES.push({
+    id: 'cpl', name: 'Clôtures Portails du Limousin',
+    match: c => /CLOTURES PORTAILS DU LIMOUSIN/i.test(c.all),
+    parse(c) {
+      const o = sageParse(c, 'sage'), T = c.T, i = T.findIndex(s => /^AR\d+\s/.test(s));
+      const blk = []; for (let k = i; k < T.length && !/^(IDEM|Taux)/.test(T[k]); k++) blk.push(T[k]);
+      const idem = T.find(s => /^IDEM/i.test(s)); if (idem) { o.ref = idem.replace(/^IDEM\s*COMMANDE\s*/i, '').replace(/\s+/g, ''); }
+      const txt = blk.join(' ').replace(PRICE_TAIL, '').replace(/^AR\d+\s+/, '');
+      const sp = freeText(txt); sp.head = blk[0].replace(/^AR\d+\s+/, '').replace(PRICE_TAIL, ''); sp.title = sp.head;
+      sp.src = { L: txt, H: txt, ral: txt, fixPot: txt };
+      sp.notes = idem ? [idem] : [];
+      return { client: o, specs: [sp] };
+    },
+  });
+  PROFILES.push({
+    id: 'rezo', name: 'Rezo Clôtures',
+    match: c => /REZO CLOTURES/i.test(c.all),
+    parse(c) {
+      const o = sageParse(c, 'sage'), specs = copiedBlocks(c.T, c.I, { end: /^(Siret|Taux|Code article)/ });
+      return { client: o, specs };
+    },
+  });
+
+  // Lambert (agências): bom de commande com a designação livre ou copiada do Chiffreur
+  PROFILES.push({
+    id: 'lambert', name: 'Lambert Clôtures',
+    match: c => /lambert-clotures\.com|ETS PAUL LAMBERT/i.test(c.all),
+    parse(c) {
+      const T = c.T, L = c.L, ag = T.findIndex(s => /^Agence de/i.test(s));
+      const o = { societe: 'Lambert Clôtures – ' + T[ag].trim(), address: [], tel: '', email: firstEmail(T, /ferplay/i), ref: '', ncde: '', contact: '' };
+      o.tel = ((T.find(s => /^T[ée]l\s*:/.test(s)) || '').replace(/^T[ée]l\s*:\s*/, '')).split(/\s/)[0];
+      const ia = T.findIndex(s => /^ADRESSE DE LIVRAISON/.test(s));
+      const ia2 = ia;
+      if (ia >= 0) {   // morada de entrega explícita (pode continuar na página seguinte)
+        o.address = [T[ia + 1]]; const ci = T.findIndex((s, j) => j > ia && /^\d{5}\s+[A-Z][A-Z' -]+$/.test(s)); if (ci >= 0) o.address.push(T[ci]);
+        const ct = T.find(s => /^CONTACT\s/.test(s)); if (ct) o.tel = ct.replace(/^CONTACT\s*/, '').trim();
+      } else if (/DEPOT DE/i.test(c.all)) { o.address = T.slice(ag + 1, ag + 3); }
+      const rf = T.find(s => /^REF\//.test(s)); if (rf) o.ref = rf.replace(/^REF\/\s*/, '').trim();
+      const nm = T.find(s => /^FFERPL?0?\s/.test(s)); if (nm) { const mm = nm.match(/(AC\d+)/); if (mm) o.ncde = mm[1]; }
+      let specs = copiedBlocks(T, c.I, { end: /^(ZPORT|ADRESSE|POIDS|TOTAL|Accessoires)/ });
+      if (!specs.length) {
+        const i = T.findIndex(s => /^FERPP\w+\s+Portail/i.test(s)), blk = []; for (let k = i; k < T.length && !/^(POIDS|TOTAL|ETS PAUL)/.test(T[k]); k++) blk.push(T[k]);
+        const txt = blk.join(' ').replace(/\s+1\s+1813\s+1813/, '').replace(/^FERPP\w+\s+/, '');
+        const sp = freeText(txt); sp.head = txt.slice(0, 60); sp.title = blk[0].replace(/^FERPP\w+\s+/, '');
+        sp.src = { L: txt, H: txt, ral: txt, fixPot: txt, sens: txt };
+        sp.serSrc = 'ATTENTION : Sans serrure'; sp.flags = [];
+        // 5.00m / 1.70m em linhas diferentes: «L 5.00m HT» + «1.70m»
+        const mm = txt.match(/L\s*([\d.,]+)\s*m\s*HT\s*([\d.,]+)\s*m/i); if (mm) { sp.L = mmOf(mm[1] + 'm'); sp.H = mmOf(mm[2] + 'm'); }
+        sp.notes = ['Ordem de compra: ' + (blk[1] || '').slice(0, 0)].filter(x => x.length > 18);
+        specs = [sp];
+      }
+      return { client: o, specs };
+    },
+  });
+
+  // DISTRICLOS (ERP Pastel): campos «Modèle n° :», «Largeur entre pilier :»…
+  PROFILES.push({
+    id: 'districlos', name: 'Districlos',
+    match: c => /DISTRICLOS/i.test(c.all) && /Adresse de facturation/.test(c.all),
+    parse(c) {
+      const L = c.L, T = c.T, ia = findIdx(L, /^Adresse de facturation/), ie = findIdx(L, /^Date Num[ée]ro pi[èe]ce/);
+      const dl = L.slice(ia + 1, ie).map(l => col(l, 240, 430)).filter(Boolean).filter(s => !/^FR\b|FRANCE$/.test(s) && !/^Email/.test(s));
+      const row = (T[ie + 1] || '').match(/^(\d{2}\/\d{2}\/\d{4})\s+(\d+)\s+(\S+)\s+(\S+)(?:\s+(.*))?$/) || [];
+      const o = { societe: dl[0] || 'DISTRICLOS', address: dl.slice(1), contact: col(L[ia + 1], 430, 999), tel: '', email: firstEmail(T, /fournisseurs@|ferplay/i), ncde: row[2] || '', ref: (row[5] || row[4] || '').trim() };
+      const notes = []; if (row[4] && row[5]) notes.push('Réf. Districlos ' + row[4]);
+      // produto
+      const ip = T.findIndex(s => /^(DP|PORT)\w+\s+(Portail|Portillon)/i.test(s)), ie2 = T.findIndex(s => /^Total HT/.test(s)), blk = T.slice(ip, ie2 > ip ? ie2 : ip + 30);
+      const kv = {}; for (const s of blk) { const m = s.match(/^([^:]{3,40}?)\s*:\s*(.+)$/); if (m) kv[nz(m[1])] = m[2].trim(); }
+      const sp = { kind: '', head: blk[0].replace(/^\w+\s+/, '').replace(PRICE_TAIL, '').replace(/\s+UNIT.*$/, ''), src: {} };
+      sp.title = sp.head;
+      if (kv['modele n']) { /* «2 V» = número do modelo do cliente: não existe no catálogo */ }
+      const ft = blk.join(' ');
+      sp.kind = /double battant|2 v/i.test(ft) ? 'battant' : kindOf(blk[0]);
+      if (/double battant/i.test(ft)) sp.vantaux = '2v';
+      if (kv['largeur entre pilier']) { sp.L = mmOf(kv['largeur entre pilier']); sp.src.L = 'Largeur entre pilier : ' + kv['largeur entre pilier']; }
+      if (kv['hauteur au pilier']) { sp.H = mmOf(kv['hauteur au pilier']); sp.src.H = 'Hauteur au pilier : ' + kv['hauteur au pilier']; }
+      if (kv['sens d ouverture']) { const m = nz(kv['sens d ouverture']).match(/(poussant|tirant) (droit|gauche)/); if (m) { sp.sens = m[1][0].toUpperCase() + m[1].slice(1) + ' ' + m[2]; sp.src.sens = 'Sens d\'ouverture : ' + kv['sens d ouverture']; } }
+      if (kv['finition']) { const r = ralOf(kv['finition']); if (r) { sp.ral = r; sp.src.ral = 'Finition : ' + kv['finition']; } }
+      if (kv['type de fermeture'] && /motorisable/i.test(blk.join(' '))) { sp.ouv = 'motorisable'; sp.src.ouv = 'Type de fermeture : Motorisable'; }
+      sp.left = ['Remplissage : ' + (kv['type de remplissage'] || ''), 'Forme : ' + (kv['forme'] || ''), 'Hauteur au centre : ' + (kv['hauteur au centre'] || ''), 'Cadre : ' + (kv['cadre'] || '')].filter(x => !/: $/.test(x));
+      if (!blk.length || !kv['largeur entre pilier']) {   // linha só com a designação («Portillon ZOU+ Larg 1m Ht 1m50 Gris à sceller»)
+        const t = blk[0] || ''; const m = t.match(/Larg\s*(\S+)\s*Ht\s*(\S+)/i);
+        if (m) { sp.L = mmOf(m[1]); sp.H = mmOf(m[2]); sp.src.L = t; sp.src.H = t; }
+        if (/sceller/i.test(t)) { sp.fixPot = 'sceller'; sp.src.fixPot = t; }
+        sp.kind = kindOf(t);
+      }
+      sp.notes = ['Modèle ' + (kv['modele n'] ? '« ' + kv['modele n'] + ' » (Districlos)' : '') + ' : à choisir'];
+      return { client: o, specs: [sp], notes };
+    },
+  });
+
+  // DOMATEC (GROUPE HORUS) — texto com codificação MacRoman trocada
+  const MAC = [[/È/g, 'é'], [/Ë/g, 'è'], [/‡/g, 'à'], [/Ù/g, 'ô'], [/∞/g, '°'], [/∫/g, 'º'], [/…/g, 'É'], [/‘/g, 'Ô'], [/†/g, ' '], [/Í/g, 'ê'], [/Ó/g, 'î']];
+  const macFix = s => MAC.reduce((a, [re, r]) => a.replace(re, r), s);
+  PROFILES.push({
+    id: 'domatec', name: 'Domatec (Groupe Horus)', fix: macFix,
+    match: c => /GROUPE HORUS|groupehorus/i.test(c.all),
+    parse(c) {
+      const T = c.T, o = { societe: 'GROUPE HORUS', address: [], contact: '', tel: '', email: firstEmail(T, /ferplay/i), ref: '', ncde: '', quote: '' };
+      // faturação (coluna do meio) | entrega (coluna da direita)
+      const L = c.L, ia = findIdx(L, /Mat[ée]riel destin/), ib = findIdx(L, /^Livraison/, ia), rows = L.slice(ia + 1, ib > ia ? ib : ia + 5);
+      const bill = rows.map(l => col(l, 170, 375)).filter(Boolean), dlv = rows.map(l => col(l, 375, 999)).filter(Boolean);
+      o.societe = [bill[0], dlv[0]].filter(Boolean).join(' '); o.address = dlv.slice(1);
+      o.contact = (T.find(s => /^Acheteur/.test(s)) || '').replace(/^Acheteur\s*/, '').trim();
+      o.ncde = ((T.find(s => /^COMMANDE N/.test(s)) || '').match(/N\s*\S?\s*(\d{4,})/) || [])[1] || '';
+      const af = T.find(s => /Affaire/.test(s)); const rf = af && af.match(/Affaire\s+\S+\s+(.*)$/); if (rf) o.ref = rf[1].trim();
+      const dv = T.find(s => /DEV(?:IS)? N/.test(s)); if (dv) o.quote = (dv.match(/(F\d{2}\/\w+)/) || [])[1] || '';
+      // produtos: «G-AS …» + descrição
+      const starts = []; T.forEach((s, i) => { if (/^G-AS\s/.test(s)) starts.push(i); });
+      const specs = starts.map((i, k) => {
+        const end = k + 1 < starts.length ? starts[k + 1] : T.findIndex((s, j) => j > i && /^(Page 2|COMMANDE N|Livraison)/.test(s) && j > i + 3), blk = T.slice(i, end > i ? end : T.length);
+        const txt = blk.join(' '), sp = { kind: 'cloture', ind: 'Herculeos N°2A', title: blk[0].replace(PRICE_TAIL, '').replace(/\d{2}\/\d{2}\/\d{2}.*$/, ''), src: {} };
+        const m = txt.match(/(\d+)\s*panneaux?\s*\(L\s*(\d+)\s*x\s*H\s*(\d+)\s*mm\)/i) || txt.match(/(\d+)\s*panneau\s*\(L\s*(\d+)\s*x\s*H\s*(\d+)\s*mm\)/i);
+        if (m) { sp.qt = Number(m[1]); sp.H = Number(m[3]); sp.src.H = m[0]; sp.cloNote = m[1] + ' panneau(x) de ' + m[2] + ' mm (longueur ' + (Number(m[1]) * Number(m[2])) + ' mm)'; }   // clôture standard: a quantidade são os painéis (não há campo de largura)
+        if (/sceller/i.test(txt)) { sp.fixPot = 'sceller'; sp.src.fixPot = 'poteaux 60x60 à sceller'; }
+        sp.notes = ['Modèle « Herculeos n°2A (modifié) » : confirmar variante'].concat(sp.cloNote ? [sp.cloNote] : []);
+        if (/sans poteau/i.test(txt)) sp.notes.push('Sans poteau, sur muret');
+        return sp;
+      });
+      return { client: o, specs };
+    },
+  });
+
+  // GDV (Groupe Desmarais)
+  PROFILES.push({
+    id: 'gdv', name: 'GDV',
+    match: c => /GDV SIEGE|gdv\.fr/i.test(c.all),
+    parse(c) {
+      const T = c.T, o = { societe: 'GDV', address: [], contact: '', tel: '', email: firstEmail(T, /ferplay/i), ref: '', ncde: '' };
+      const ia = T.findIndex(s => /^ADRESSE DE LIVRAISON/.test(s)); const ad = T.slice(ia + 1, ia + 4);
+      const ct = ad.find(s => /\+?\d{9,}/.test(s)); if (ct) { o.contact = ct.replace(/\s*\+?\d[\d ]{8,}\s*$/, '').trim(); o.tel = (ct.match(/\+?\d[\d ]{8,}\d/) || [''])[0]; }
+      o.address = ad.filter(s => s !== ct);
+      o.ref = ((T.find(s => /^R[ée]f[ée]rence\s*:/.test(s)) || '').replace(/^R[ée]f[ée]rence\s*:\s*/, '') || T[T.findIndex(s => /^R[ée]f[ée]rence\s*:/.test(s)) + 1] || '').trim();
+      o.ncde = (T.find(s => /^BC\d+/.test(s)) || '').split(/\s+/)[0];
+      const dq = T.find(s => /^DEVIS N/.test(s)); if (dq) o.quote = (dq.match(/(F\d{2}\/\w+)/) || [])[1] || '';
+      const il = T.findIndex(s => /VANTAIL|PORTAIL|PORTILLON/i.test(s) && /\d,\d{2}/.test(s));
+      const sp = { kind: kindOf(T[il] || ''), title: (T[il] || '').replace(/^\S+\s+/, '').replace(PRICE_TAIL, ''), src: {}, notes: ['Sem medidas no pedido (« selon cde » : ver o pedido anterior ' + (T[il + 1] || '') + ')'] };
+      sp.head = sp.title; sp.kind = sp.kind || 'coulissant';
+      return { client: o, specs: [sp] };
+    },
+  });
+
+  // GRILLAGES NAAS
+  PROFILES.push({
+    id: 'naas', name: 'Grillages Naas',
+    match: c => /grillages-naas/i.test(c.all),
+    parse(c) {
+      const T = c.T, L = c.L, o = { societe: 'GRILLAGES NAAS', address: [], contact: '', tel: '', email: '', ref: '', ncde: '' };
+      const dd = s => { const h = Math.floor(s.length / 2); return s.slice(0, h) === s.slice(h) ? s.slice(0, h) : s; };
+      const ir = T.findIndex(s => /^BC\d+BC\d+/.test(s)); const row = T[ir] || '';
+      const em = row.match(EMAIL); if (em) { const e = dd(em[0]); o.email = e; }
+      const nm = row.match(/^BC\d+/); if (nm) { const h = nm[0]; o.ncde = h.slice(0, h.length / 2) === h.slice(h.length / 2) ? h.slice(0, h.length / 2) : h; if (/^BC(\d+)BC\1$/.test(row.split(' ')[0])) o.ncde = row.split(' ')[0].replace(/^(BC\d+)BC\d+$/, '$1'); }
+      const cn = row.match(/BC\d+BC\d+\s+([A-Z ]+?)(?:[A-Z][a-z]|[A-Z]{2,}\s)/); const cm = row.match(/([A-Z]{3,}(?: [A-Z]{3,})?)\1/); if (cm) o.contact = cm[1];
+      const tel = T.find(s => /^\d{2}\.\d{2}\.\d{2}\.\d{2}\.\d{2}\d{2}\.\d{2}/.test(s)); if (tel) o.tel = tel.slice(0, 14);
+      o.contact = o.contact || ((row.match(/BC\d+BC\d+\s+(\S+ \S+)/) || [])[1] || '').replace(/(.+?)\1.*/, '$1');
+      o.ref = (T.find(s => /^Commercial en charge/.test(s)) ? '' : '');
+      const ip = T.findIndex(s => /^PORTILL\b|^PORTAIL\b/i.test(s)), blk = T.slice(ip, ip + 4).filter(s => !/^TOTAL/.test(s));
+      const txt = blk[0].replace(/^\S+\s+/, '').replace(PRICE_TAIL, '');
+      const sp = { kind: kindOf(txt), head: txt, title: txt, src: {}, obs: [] };
+      if (/b54/i.test(txt)) sp.ind = /grillag/i.test(txt) ? 'B54 Grillagé' : 'B54 Barreaudé';
+      const m = txt.match(/passage\s*(\d[mM]\d*)\s*[xX]\s*(\d[mM]\d*)/i); if (m) { sp.L = mmOf(m[1]); sp.H = mmOf(m[2]); sp.src.L = txt; sp.src.H = txt; }
+      sp.notes = blk.slice(1).filter(Boolean); sp.obs = blk.slice(1).filter(Boolean);
+      return { client: o, specs: [sp] };
+    },
+  });
+
+  // ICONIX
+  PROFILES.push({
+    id: 'iconix', name: 'Iconix',
+    match: c => /iconix\.fr|SOCIETE FERPLAY/i.test(c.all) && /ICONIX/.test(c.all),
+    parse(c) {
+      const T = c.T, L = c.L, o = { societe: 'ICONIX', address: [], contact: '', tel: '', email: firstEmail(T, /ferplay/i), ref: '', ncde: '' };
+      const ih = T.findIndex(s => /^N° de commande/.test(s)), rw = (T[ih + 1] || '').match(/^(\S+)\s+(\d{2}\/\d{2}\/\d{2})\s+(.*)$/) || [];
+      o.ncde = rw[1] || ''; const il = findIdx(L, /^N° de commande/);
+      o.address = [rw[3]].concat(L.slice(il + 2, il + 5).map(l => col(l, 280, 999))).filter(Boolean).slice(0, 4).map(s => s.replace(/^R[ée]f[ée]rence\s*:.*$/, '')).filter(Boolean);
+      const rf = T.find(s => /^R[ée]f[ée]rence\s*:/.test(s)); if (rf) { const m = rf.match(/R[ée]f[ée]rence\s*:\s*(\S+)/); o.ref = m ? m[1] : ''; const tail = rf.replace(/^R[ée]f[ée]rence\s*:\s*\S+\s*/, ''); if (tail) o.address.push(tail); }
+      o.address = unique(o.address).filter(s => nz(s) !== 'iconix');
+      const t = T.find(s => /^T:\d+/.test(s)); if (t) o.tel = (t.match(/T:(\d+)/) || [])[1] || '';
+      const ip = T.findIndex(s => /^A49\s+PORTAIL/i.test(s)), blk = T.slice(ip, T.findIndex(s => /^Total HT/.test(s)));
+      const txt = blk.join(' '), sp = freeText(txt.replace(PRICE_TAIL, ''));
+      sp.head = blk[0].replace(PRICE_TAIL, '').replace(/\s+1,000.*$/, ''); sp.title = sp.head;
+      const m = txt.match(/hors tout\s*:\s*(\d+)\s*x\s*(\d+)/i); if (m) { sp.L = Number(m[1]); sp.H = Number(m[2]); }
+      const r = txt.match(/Ral\s*:\s*(\d{4})/i); if (r) sp.ral = r[1];
+      sp.src = { L: 'Dimensions hors tout : ' + (m ? m[1] + ' x ' + m[2] : ''), H: 'Dimensions hors tout', ral: 'Ral : ' + sp.ral };
+      sp.kind = 'battant'; sp.ind = 'A49'; sp.flags = []; sp.notes = ['Dimensões « hors tout » assumidas como largura × altura'];
+      return { client: o, specs: [sp] };
+    },
+  });
+
+  // Côté Clôture
+  PROFILES.push({
+    id: 'coteclot', name: 'Côté Clôture',
+    match: c => /C[ôo]t[ée] Cl[ôo]ture|cote-cloture/i.test(c.all) && /BON DE COMMANDE/.test(c.all),
+    parse(c) {
+      const T = c.T, L = c.L, o = { societe: 'Côté Clôture', address: [], contact: '', tel: '', email: '', ref: '', ncde: '' };
+      const ia = findIdx(L, /^Adresse de livraison/), ie = findIdx(L, /^Acheteur/);
+      o.address = L.slice(ia + 2, ie).map(l => col(l, 0, 140)).filter(s => s && !/^Email|^2025/.test(s)).slice(0, 4);
+      o.ncde = ((T[0] || '').match(/N°\s*(\S+)/) || [])[1] || '';
+      o.contact = (T.find(s => /^Acheteur/.test(s)) || '').replace(/^Acheteur\s*:\s*/, '');
+      o.ref = (T.find(s => /^R[ée]f[ée]rence\s*:/.test(s)) || '').replace(/^R[ée]f[ée]rence\s*:\s*/, '').trim();
+      const ct = T.find(s => /^Contact Agence/.test(s)); if (ct) { o.tel = (ct.match(/:\s*([\d ]{10,})/) || [])[1] || ''; o.email = (ct.match(EMAIL) || [''])[0]; o.tel = o.tel.trim(); }
+      const ip = T.findIndex(s => /Portail Acier BF1/.test(s)), ie2 = T.findIndex(s => /^TOTAL HT/.test(s)), blk = T.slice(ip, ie2);
+      const txt = blk.join(' '), body = blk.slice(1);
+      const prod = I_parse(c, ['Habitat > ' + 'BF1', 'Portail 2 Vantaux'].concat(body.filter(x => /:/.test(x) && !/^COMPRIS/.test(x))));
+      const sp = { prod, hab: 'BF1', kind: 'battant', vantaux: /2 vantaux/i.test(txt) ? '2v' : '', head: blk[0].replace(/^\d+\s+/, '').replace(PRICE_TAIL, ''), title: blk[0].replace(/^\d+\s+/, ''), src: {} };
+      const pl = txt.match(/POTEAUX SUR PLATINE\s*(\d{2,3})\s*X\s*\1/i); if (pl) { sp.fixPot = 'visser'; sp.potSec = pl[1]; sp.flags = []; }
+      sp.left = body.filter(x => !/:/.test(x) && !/^COMPRIS|^2 Vantaux/.test(x));
+      sp.notes = ['Hauteur H2 = hauteur ao montante'];
+      return { client: o, specs: [sp] };
+    },
+  });
+  const I_parse = (c, lines) => c.I.parseBlock(lines);
+
+  // 100 % Menuiseries (bon de commande configurado)
+  PROFILES.push({
+    id: 'cent', name: '100 % Menuiseries',
+    match: c => /100 % Menuiseries/i.test(c.all) && /TABLEAU DE CONFIGURATION/i.test(c.all),
+    parse(c) {
+      const T = c.T, L = c.L, o = { societe: '100 % Menuiseries', address: [], contact: '', tel: '', email: firstEmail(T, /ferplay/i), ref: '', ncde: '', quote: '' };
+      const ia = T.findIndex(s => /^ADRESSE DE LIVRAISON/.test(s)); const ad = []; for (let k = ia + 1; k < T.length && !/^centpourcent|^02 |^Livraison/i.test(T[k]); k++) ad.push(T[k]);
+      const adr = ad.filter(s => !/^T[ÉE]L/.test(s)).map(s => s.replace(/^>\s*/, ''));
+      o.contact = adr[0] || ''; o.address = adr.slice(1).filter(s => !/^Rep[èe]re/i.test(s)).slice(0, 3);
+      const tl = ad.find(s => /^T[ÉE]L/.test(s)); o.tel = tl ? tl.replace(/^T[ÉE]L\s*/, '').trim() : '';
+      const bc = T.find(s => /^Bon de commande —/.test(s)); if (bc) { const p = bc.split('—').map(x => x.trim()); o.ref = p[1] || ''; o.ncde = p[2] || ''; }
+      const dv = T.find(s => /^Votre devis/.test(s)); if (dv) o.quote = (dv.match(/devis\s+(\S+)/i) || [])[1] || '';
+      const txt = T.slice(T.findIndex(s => /^PRODUIT/.test(s)), ia).join(' ');
+      const sp = { hab: '', kind: 'battant', src: {}, notes: [], setByLabel: [] };
+      const m = txt.match(/mod[èe]le\s+(A\d+\.\d)/i); if (m) { sp.hab = m[1]; }
+      sp.head = (T.find(s => /^PRODUIT/.test(s)) || '').replace(/^PRODUIT\s*/, ''); sp.title = sp.head;
+      sp.kind = kindOf(sp.head) || 'battant';
+      const w = txt.match(/Largeur\s*([\d ]+)\s*mm\s*entre piliers/i); if (w) { sp.L = Number(w[1].replace(/\s/g, '')); sp.src.L = w[0]; }
+      const h = txt.match(/Hauteur\s*([\d ]+)\s*mm\s*sous chapeaux/i); if (h) { sp.H = Number(h[1].replace(/\s/g, '')); sp.src.H = h[0]; }
+      if (/ouverture manuelle/i.test(txt)) { sp.ouv = 'manuel'; sp.src.ouv = 'MANŒUVRE Ouverture manuelle'; }
+      if (/serrure/i.test(txt)) { sp.serrure = true; sp.serSrc = 'serrure à canon européen'; }
+      const se = txt.match(/(Poussant|Tirant) (droit|gauche)/i); if (se) { sp.sens = se[1] + ' ' + se[2].toLowerCase(); sp.src.sens = se[0]; }
+      if (/RAL 900 sabl/i.test(txt)) { sp.ral = '9005'; sp.src.ral = 'RAL 900 sablé (noir) → déduit RAL 9005 (le bon cite « au lieu du RAL 9005 »)'; sp.notes.push('RAL « 900 » lu comme 9005 (noir)'); }
+      const fl = txt.match(/Fers de lance mod[èe]le\s*([A-Z])/i); if (fl) sp.setByLabel.push({ re: /fers de lance/i, val: fl[1], src: fl[0] });
+      const mt = txt.match(/traverse haute\s*:\s*([^.]+?)\s+(?:Le dessin|MAN)/i); if (mt) sp.setByLabel.push({ re: /traverse haute/i, val: mt[1].trim().replace(/^./, x => x.toUpperCase()), src: 'Habillage et fer forgé dans traverse haute : ' + mt[1] });
+      sp.flags = ['pivot standard acier', 'finition texturée (sablé métallisé thermolaqué)'];
+      sp.obs = ['Finition texturée (sablé)'];
+      return { client: o, specs: [sp] };
+    },
+  });
+
+  // SBFM
+  PROFILES.push({
+    id: 'sbfm', name: 'SBFM',
+    match: c => /sbfm-grillage|BCS\d+/i.test(c.all),
+    parse(c) {
+      const T = c.T, L = c.L, o = { societe: 'SBFM', address: [], contact: '', tel: '', email: firstEmail(T, /ferplay/i), ref: '', ncde: '' };
+      const ih = findIdx(L, /^N° de Commande/), ie = findIdx(L, /^REF\. DESIGNATION/), rows = L.slice(ih + 1, ie > ih ? ie : ih + 9).map(l => col(l, 330, 999)).filter(Boolean);
+      const nm = T.slice(ih, ih + 4).map(s => s.match(/^(BCS\d+)/)).find(Boolean); o.ncde = nm ? nm[1] : '';
+      const adr = rows.filter(s => !/^N° facture|^T[ée]l|^R[ée]f/.test(s)); o.address = adr.slice(0, 3);
+      const ct = T.find(s => /^N° facture fournisseur/.test(s)); if (ct) { const m = ct.match(/T[ée]l\s*:\s*(.+?)\s+(\d{9,})/); if (m) { o.contact = m[1]; o.tel = m[2]; } }
+      const rf = T.find(s => /^R[ée]f[ée]rence\s*:/.test(s)); if (rf) o.ref = rf.replace(/^R[ée]f[ée]rence\s*:\s*/, '').trim();
+      const specs = copiedBlocks(T, c.I, { end: /^(PORT |Total HT|Page|S\.A\.S)/ });
+      const ill = T.find(s => /ILLICLOT/i.test(s));
+      const out = { client: o, specs };
+      if (ill) out.ignored = [ill.replace(PRICE_TAIL, '') + ' (linha de outro fornecedor, não é produto Ferplay)'];
+      return out;
+    },
+  });
+
+  // PORTIS (OTIS)
+  PROFILES.push({
+    id: 'portis', name: 'Portis (Otis)',
+    match: c => /OTIS \(PORTIS\)|Supplier Purchase Order/i.test(c.all),
+    parse(c) {
+      const T = c.T, L = c.L, o = { societe: 'OTIS (PORTIS)', address: [], contact: '', tel: '', email: '', ref: '', ncde: '' };
+      const io = T.findIndex(s => /^\d{8}$/.test(s)); o.ncde = T[io] || '';
+      const id = findIdx(L, /Delivery Adress/), dl = L.slice(id + 1, id + 6).map(l => col(l, 200, 440)).filter(s => s && !/^- Par|^OTIS-|^ORDER/.test(s));
+      o.address = dl.slice(1, 3).reduce((a, s) => a.concat(s.replace(/\s+(France|FR)\s*\.?$/i, '|$1').split('|')), []).filter(Boolean);
+      const rq = T.findIndex(s => /^\d{2}\/\d{2}\/\d{4}\s+\d{9}/.test(s)); const m = (T[rq] || '').match(/^\S+\s+\d+\s+(.+?)\s+Virement/); if (m) o.contact = m[1].trim();
+      const ip = T.findIndex(s => /^APORTA\w+\s+\d+\s+EA/.test(s)), pr = (T[ip] || '').match(/^(\S+)\s+(\d+)\s+EA\s+(F\d{2}\/\w+)/);
+      o.ref = pr ? pr[3] : ''; o.quote = o.ref;
+      const sp = { kind: '', title: 'Ligne ' + (pr ? pr[1] : '') + ' – devis Ferplay ' + (pr ? pr[3] : ''), head: pr ? pr[1] : '', src: {}, notes: ['Le bon de commande ne décrit pas le produit : voir le devis Ferplay ' + (pr ? pr[3] : '')] };
+      sp.qt = pr ? Number(pr[2]) : 1;
+      return { client: o, specs: [sp] };
+    },
+  });
+
+  // #LI072138 usa o perfil «boutique». Perfil genérico (último recurso): lê o que for fiável e deixa o resto
+  PROFILES.push({
+    id: 'generic', name: 'Outro cliente',
+    match: c => /(bon de commande|commande|purchase order)/i.test(c.all) && /ferplay/i.test(c.all),
+    parse(c) {
+      const T = c.T, o = { societe: '', address: [], contact: '', tel: '', email: firstEmail(T, /ferplay/i), ref: '', ncde: '' };
+      const sp = freeText(T.join(' ')); sp.head = 'Produit non identifié'; sp.title = sp.head; sp.notes = ['Format de client inconnu : vérifiez chaque champ'];
+      return { client: o, specs: [] , generic: true };
+    },
+  });
+
+  // ---------------------------------------------------------------- entrada
+  function analyse(lines, I) {
+    const base = lines.map(l => l);
+    let prof = null, c = null;
+    for (const p of PROFILES) {
+      const L = p.fix ? base.map(l => ({ page: l.page, text: p.fix(l.text), items: (l.items || []).map(i => ({ x: i.x, w: i.w, s: p.fix(i.s) })) })) : base;
+      const cc = { L, T: L.map(l => l.text), all: L.map(l => l.text).join('\n'), I };
+      let ok = false; try { ok = p.match(cc); } catch (e) { ok = false; }
+      if (ok) { prof = p; c = cc; break; }
+    }
+    if (!prof || prof.id === 'generic') return null;
+    let r; try { r = prof.parse(c); } catch (e) { return { devis: { isChiffreur: true, fromProfile: true, profileName: prof.name, societe: '', address: [], error: e.message, products: [] }, products: [], lines }; }
+    if (r.full) return r.full;
+    const cl = r.client || {};
+    const products = r.specs.map(sp => buildProduct(sp, I, []));
+    const d = { isChiffreur: true, fromProfile: true, profileName: prof.name, profile: prof.id, devis: '', client: cl.societe || '', societe: cl.societe || '', contact: cl.contact || '', address: (cl.address || []).filter(Boolean), tel: cl.tel || '', email: cl.email || '', chantier: [cl.ncde, cl.ref].filter((x, i, a) => x && a.indexOf(x) === i).join(' '), ncde: '', refInt: cl.quote || '', clientCde: cl.ncde || '', transport: cl.transport || '', ignored: r.ignored || [], products: [] };
+    // 05/11/2026 (Gonçalo): o nº de encomenda do cliente NÃO se usa como nº de encomenda (esse é o interno do PHC, a Ferplay preenche) nem vai para as Observations:
+    // vai à frente da referência cliente («CF00001095 OFFICE IMMO»).
+    return { devis: d, products, lines };
+  }
+  window.PdfProfiles = { analyse, freeText, mmOf, PROFILES };
 })();
 </script>
 </body>
