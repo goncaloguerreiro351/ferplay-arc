@@ -102,6 +102,9 @@ footer { color: var(--muted); font-size: 12.5px; margin-top: 22px }
 .lang button[aria-pressed="true"] { background: var(--accent); color: #fff }
 header.top > div:last-child { order: 2; flex: 1 1 320px; min-width: 0 }
 @media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth } }
+.pdfpanel{border:1px solid var(--line);border-radius:10px;padding:12px;margin:10px 0;background:var(--surface)}
+.pdfhead{margin-bottom:8px}.pdfcard{margin:8px 0}.pdflog{margin:6px 0 0 18px;padding:0;font-size:13px}.pdflog .src{color:var(--muted)}
+.btnlike .b{display:inline-block;padding:8px 14px;border-radius:8px;background:var(--accent);color:#fff;font-weight:700;cursor:pointer}
 </style>
 </head>
 <body>
@@ -179,6 +182,7 @@ viewBox="0 0 17206.5 4581.43"
       <div class="f" data-c="societe"><label class="req" for="c_societe">Société</label><input type="text" id="c_societe" autocomplete="organization"></div>
       <div class="f" data-c="ref"><label class="req" for="c_ref">Référence client / chantier</label><input type="text" id="c_ref"></div>
       <div class="f" data-c="ncde"><label for="c_ncde">Nº Votre CDE</label><input type="text" id="c_ncde" maxlength="8"><span class="hint">Facultatif.</span></div>
+      <div class="f" data-c="norc" hidden><label for="c_norc">Nº du devis</label><input type="text" id="c_norc" maxlength="30"><span class="hint">Facultatif : si vous avez demandé un devis avant cette commande.</span></div>
       <div class="f" data-c="drec" hidden><label for="c_drec">Date de réception</label><input type="date" id="c_drec"><span class="hint">Version interne : date de réception de la commande (aujourd’hui par défaut ; modifiable si l’ARC est fait plus tard).</span></div>
     </div>
     <p class="sub">Contact</p>
@@ -1040,6 +1044,18 @@ viewBox="0 0 17206.5 4581.43"
           continue;
         }
       }
+      // 05/11/2026 (Sónia): todos os motifs e decors que têm caixa no ARC levam cruz (antes iam só para as Observations)
+      { const sv = typeof val === 'string' ? val : '';
+        if (/^Rosace$/i.test(sv) && box(/^ROSACE$/)) continue;
+        if (/^Macarons$/i.test(sv) && box(/^MACARONS$/)) continue;
+        if (/encadrement de rosace/i.test(sv) && box(/fer plat|ferplat/i.test(sv) ? /^ENCADREMENT DE ROSACE FERPLAT$/ : /^ENCADREMENT ROSACE EN FER MOULURE$/)) continue;
+        if (/rang. de rond/i.test(sv) && box(/^RANGEE DE RONDS$/)) { if (/altern/i.test(sv)) obs.push(lab + ' : ' + val); continue; }
+        if (/volute/i.test(sv) && box(/^JEU DE VOLUTES$/)) { obs.push(lab + ' : ' + val); continue; }
+        if (val && typeof val === 'object' && /d.cor|motif/i.test(lab)) {
+          const it = Object.entries(val).filter(([, q]) => Number(q) > 0);
+          if (it.length) { box(/^RANGEE DE MOTIFS$/); obs.push(lab + ' : ' + it.map(([k, q]) => k + ' × ' + q).join(', ')); }
+          continue;
+        } }
       if (/manchon/i.test(String(val))) {
         const re = /huit|n.?1\b/i.test(val) ? /^MANCHONS N.?1/ : (/petit|n.?2\b/i.test(val) ? /^MANCHONS N.?2/ : null);
         if (re && box(re)) { obs.push(lab + ' : ' + val); continue; }
@@ -1271,14 +1287,17 @@ viewBox="0 0 17206.5 4581.43"
       if (!f.acroField.getDefaultAppearance()) f.acroField.setDefaultAppearance('/Helv 9 Tf 0 g');
       // o mesmo tamanho em todo o ARC (9 pt); o tamanho pedido pela chamada deixa de contar nos campos de uma linha
       if (f.setAlignment && f.acroField.getWidgets()[0].getRectangle().width > 100) f.setAlignment(LIB.TextAlignment.Left);   // texto longo junto ao rótulo
-      if (f.setAlignment && /^REF[ _-]CLIENT$/.test(name.replace(/^P\d+_/, ''))) f.setAlignment(LIB.TextAlignment.Right);   // 03/11/2026 (testes internos): a ref. do cliente encostada à direita
+      const nmA = name.replace(/^P\d+_/, '');
+      if (f.setAlignment && /^(REF[ _-]CLIENT|Nº CMD)$/.test(nmA)) f.setAlignment(LIB.TextAlignment.Right);   // 03/11/2026: a ref. do cliente encostada à direita; 05/11/2026 (Sónia): o Nº de encomenda também
+      if (f.setAlignment && /^(SOCIETE|CLIENT)$/.test(nmA)) f.setAlignment(LIB.TextAlignment.Left);   // 05/11/2026 (Sónia): o nome do cliente à esquerda
       for (const w of f.acroField.getWidgets()) {
         const r = w.getRectangle();
         // 27/10/2026 (feedback do Alumínio): cabeçalho com os dados do cliente e o Nº CDE em letra maior (11 pt; encolhe só se não couber)
         const nm0 = name.replace(/^P\d+_/, '');
         let sz = /^Nº CMD$/.test(nm0) ? 16 : (/^(EXPEDITEUR|SOCIETE|CLIENT|TELEPHONE|REF[ _-]CLIENT)$/.test(nm0) ? 11 : 9);   // 03/11/2026 (testes internos): Nº de encomenda a 16 pt
         if (!ln || ln.box) sz = Math.min(sz, Math.max(5, (r.height - 1.5) / 1.18));
-        while (sz > 4.5 && font.widthOfTextAtSize(s, sz) > r.width - 3) sz -= 0.25;
+        const fw = /^(Nº CMD|REF[ _-]CLIENT|REF-CLIENT)$/.test(nm0) ? bold : font;   // 05/11/2026: Nº de encomenda e ref. do cliente em negrito
+        while (sz > 4.5 && fw.widthOfTextAtSize(s, sz) > r.width - 3) sz -= 0.25;
         if (ln && ln.base != null) {
           const h = sz * 1.35 + 2, fundo = ln.base + (h - 0.73 * sz) / 2 - 0.05;
           w.setRectangle({ x: r.x, y: PAGE_H - fundo, width: r.width, height: h });
@@ -1440,6 +1459,7 @@ viewBox="0 0 17206.5 4581.43"
     }
     const opts = [...obsLines, ...(FI ? [] : (P.horsArc || []))];
     const obsTxt = [
+      client.typeDoc === 'commande' && client.norc ? tr('Devis') + ' ' + tr('Nº') + ' ' + client.norc : '',   // 05/11/2026 (Sónia): Nº do orçamento no topo das observações
       !FI && P.surMesure && P.tpl !== 'REGIONALE-SM' ? 'RÉGIONALE SUR MESURE' : '',
       p.obs,
       opts.length ? (P.surMesure ? '' : tr('Options') + ' : ') + opts.join(' ; ') : '',
@@ -1451,8 +1471,11 @@ viewBox="0 0 17206.5 4581.43"
     for (const fld of form.getFields()) { if (fld instanceof LIB.PDFDropdown) { const sel = (fld.getSelected() || [])[0]; if (sel) ajusta(fld, fld.getName(), ansi(sel), 9); } }
     // 26/10/2026: campos que a Ferplay preenche depois (PRIX NET, Observations, DELAI…) ficavam vazios com o tamanho automático (0) ou
     // enorme do modelo: o texto escrito no Acrobat saía em letras grandes e sem se poder mudar. Tamanho fixo em todos os campos de texto.
+    const prixDA = new Map();
     for (const fld of form.getFields()) {
       if (!(fld instanceof LIB.PDFTextField)) continue;
+      // 05/11/2026: PRIX NET fica como nos ARCs originais da Ferplay (letra automática, multilinha): o Chrome e o Acrobat encolhem-na sozinhos ao escrever
+      if (/PRIX NET$/.test(fld.getName())) { const d0 = fld.acroField.getDefaultAppearance(); fld.enableMultiline(); prixDA.set(fld, d0 ? d0.replace(/[\d.]+\s+Tf/, '0 Tf') : '/Helv 0 Tf 0 g'); continue; }
       const da = fld.acroField.getDefaultAppearance() || '', m = /([\d.]+)\s+Tf/.exec(da), sz0 = m ? parseFloat(m[1]) : 0;
       const cab = /^(EXPEDITEUR|SOCIETE|CLIENT|TELEPHONE|REF[ _-]CLIENT|Nº CMD)$/.test(fld.getName()) && !fld.getText();   // cabeçalho (só se vazio) em 11 pt (feedback do Alu, 27/10)
       if (/Nº CMD$/.test(fld.getName()) && fld.getText()) continue;   // preenchido: o tamanho já foi ajustado
@@ -1460,10 +1483,10 @@ viewBox="0 0 17206.5 4581.43"
       if (!da) fld.acroField.setDefaultAppearance('/Helv 9 Tf 0 g');
       fld.setFontSize(/Observations$/.test(fld.getName()) ? 8 : (/PRIX NET$/.test(fld.getName()) ? 16 : (/Nº CMD$/.test(fld.getName()) && !fld.getText() ? 16 : (cab ? 11 : 9))));   // 03/11/2026: preço e Nº de encomenda em letra maior
     }
-    // 04/11/2026: PRIX NET mantém o tamanho standard (16 pt) até duas linhas e, à medida que se escrevem mais linhas, a letra encolhe sozinha até caber
-    // (JavaScript do próprio campo: corre no Acrobat/Reader em cada tecla e ao sair do campo; noutros leitores fica no tamanho standard)
-    for (const fld of form.getFields()) if (fld instanceof LIB.PDFTextField && /PRIX NET$/.test(fld.getName())) autoShrinkField(fld);
     form.updateFieldAppearances(font);
+    // o pdf-lib grava o tamanho automático calculado (45 pt) no /DA: repõe-se o tamanho 0 (automático) do ARC original
+    for (const [fld, da] of prixDA) { fld.acroField.setDefaultAppearance(da); }   // 05/11/2026: tamanho automático (0) como no ARC original: o leitor desenha o texto à medida que se escreve
+    for (const fld of form.getFields()) if (fld instanceof LIB.PDFTextField && /^(P\d+_)?(Nº CMD|REF[ _-]CLIENT|REF-CLIENT)$/.test(fld.getName())) fld.updateAppearances(bold);   // 05/11/2026 (Sónia): negrito
     if (!FI) crossAppearances(doc, form);   // 03/11/2026 (feedback da Sónia): caixas quadradas, marcadas com uma cruz (✕); o pdf-lib refaz os rádios como círculos com ponto, por isso depois do updateFieldAppearances
 
     // blocos «Non concerné»
@@ -1614,6 +1637,10 @@ viewBox="0 0 17206.5 4581.43"
 // [pt, en]
 const I18N_SRC = {
   // cabeçalho, faixas, estado
+  'Quelle serrure ?': ['Qual a fechadura?', 'Which lock?'],
+  'Sans guide au sol': ['Sem guia no chão', 'No floor guide'],
+  'Nº du devis': ['Nº do orçamento', 'Quote no.'],
+  'Facultatif : si vous avez demandé un devis avant cette commande.': ['Facultativo: se pediu um orçamento antes desta encomenda.', 'Optional: if you requested a quote before this order.'],
   'Fiche technique en ligne': ['Ficha técnica online', 'Online technical sheet'],
   'Remplissez vos coordonnées une seule fois, ajoutez vos produits, puis envoyez la fiche PDF à Ferplay.': ['Preencha os seus dados uma só vez, adicione os seus produtos e envie a ficha em PDF à Ferplay.', 'Fill in your details once, add your products, then send the PDF sheet to Ferplay.'],
   '<b>Version de test.</b> Rien n\'est envoyé automatiquement.': ['<b>Versão de teste.</b> Nada é enviado automaticamente.', '<b>Test version.</b> Nothing is sent automatically.'],
@@ -2902,8 +2929,13 @@ function fieldsForAll(m, v) {
     add({ k: 'vantaux', sec: 'Ouverture', label: 'Type de portail', type: 'radio', opts: [['2v', '2 vantaux'], ['tierce', 'Vantaux inégaux (tiercé)', lim && Lv > 6000], ['mono', 'Monovantail', lim && Lv > 4000]], req: true, hint: lim ? t('Monovantail : 4 000 mm maximum. Vantaux inégaux : le grand vantail (2/3 de la largeur) ne dépasse pas 4 000 mm.') : '' }); }
   if (portail && m.ouv.length > 1) add({ k: 'ouv', sec: 'Ouverture', label: "Type d'ouverture", type: 'radio', opts: m.ouv.map(o => [o, { manuel: 'Manuelle', motorisable: 'Motorisable (prêt à motoriser, sans serrure)', motorise: 'Motorisée (sans serrure)' }[o]]), req: true });
   const ouv = m.ouv.length === 1 ? m.ouv[0] : v.ouv;
-  if (portail && ouv === 'manuel' && m.serMan && m.serMan.length) add({ k: 'serMan', sec: 'Ouverture', label: 'Serrure', type: 'radio', opts: m.serMan, req: true });
-  if (m.typeserrure) add({ k: 'typeserrure', sec: 'Ouverture', label: 'Type de serrure', type: 'radio', opts: m.typeserrure, req: true });
+  // 05/11/2026 (Sónia): primeiro «Serrure : Oui / Non» (marca a caixa do ARC); só se for Oui pergunta qual (vai para as Observations)
+  const lockQ = (portail && ouv === 'manuel' && m.serMan && m.serMan.length) || m.typeserrure;
+  if (lockQ) add({ k: 'serYN', sec: 'Ouverture', label: 'Serrure', type: 'radio', opts: ['Oui', 'Non'], req: true });
+  if (lockQ && v.serYN === 'Oui') {
+    if (portail && ouv === 'manuel' && m.serMan && m.serMan.length) add({ k: 'serMan', sec: 'Ouverture', label: 'Quelle serrure ?', type: 'radio', opts: m.serMan, req: true });
+    if (m.typeserrure) add({ k: 'typeserrure', sec: 'Ouverture', label: 'Type de serrure', type: 'radio', opts: m.typeserrure, req: true });
+  }
   if (m.potindus) add({ k: 'potindus', sec: 'Poteaux', label: 'Poteaux', type: 'radio', opts: ['Avec poteaux', 'Sans poteaux'], req: true });
   if (m.potca5) add({ k: 'potca5', sec: 'Poteaux', label: 'Poteaux', type: 'radio', opts: [['sans', 'Sans poteaux'], ['150', 'Poteaux 150×150'], ['200', 'Poteaux 200×200']], req: true });   // 27/10/2026 (decisões 10 e 48): 150×150 e 200×200 (ou sem poteaux) sempre selecionáveis de 3 a 8 m, sem o bloqueio dos 150 acima de 5 m
   // 03/11/2026 (testes internos do Ferro): com poteaux/portique escolhidos pergunta-se sempre a fixação (à visser / à sceller) e a trappe de visite
@@ -2923,13 +2955,13 @@ function fieldsForAll(m, v) {
     if (!v0.potHx || v0.potHx === v0.potHSug) v0.potHx = sugP;
     v0.potHSug = sugP;
     add({ k: 'potHx', sec: 'Poteaux', label: 'Hauteur des poteaux', type: 'number', unit: 'mm', req: false, min: 0, max: 9999, hard: true, hint: tf('Suggestion automatique : hauteur + {d} mm ; vous pouvez la modifier.', { d: dPot }) + (scel ? ' ' + t('(dont 500 mm de scellement)') : '') });
-    if (v0.potindus === 'Avec poteaux' && !m.potca5) add({ k: 'potSec', sec: 'Poteaux', label: 'Section des poteaux', type: 'select', opts: [['', '—'], ['100', '100 x 100'], ['120', '120 x 120'], ['150', '150 x 150'], ['200', '200 x 200']], req: false });
+    if (!m.potca5 && (v0.potindus === 'Avec poteaux' || v.guidage === 'Simple' || v.reception === 'Simple')) add({ k: 'potSec', sec: 'Poteaux', label: 'Section des poteaux', type: 'select', opts: [['', '—'], ['80', '80 x 80'], ['100', '100 x 100'], ['120', '120 x 120'], ['150', '150 x 150'], ['200', '200 x 200']], req: false });
   } else if (v0.potHx && v0.potHx === v0.potHSug) { delete v0.potHx; delete v0.potHSug; }
   if (hasPotApp) {
     add({ k: 'fixPot', sec: 'Poteaux', label: 'Fixation des poteaux', type: 'radio', opts: m.fixPoteaux || ['À visser', 'À sceller'], req: true });
     add({ k: 'trappe', sec: 'Poteaux', label: 'Trappe de visite', type: 'radio', opts: ['Oui', 'Non'], req: true });
   }
-  if (m.rail) add({ k: 'rail', sec: 'Poteaux', label: 'Rail au sol', type: 'radio', opts: [['visser', 'À visser (tôle pliée 4 × 75 mm)'], ['sceller', 'À sceller (profil oméga 55 × 55)']], req: true });
+  if (m.rail) add({ k: 'rail', sec: 'Poteaux', label: 'Rail au sol', type: 'radio', opts: [['visser', 'À visser (tôle pliée 4 × 75 mm)'], ['sceller', 'À sceller (profil oméga 55 × 55)'], ['sem', 'Sans guide au sol']], req: true });   // 05/11/2026 (Sónia, A45): também sem guia no chão
   if (m.kind === 'cloture') {
     if (m.gamme === 'st') {
       add({ k: 'potType', sec: 'Poteaux', label: 'Poteaux', type: 'radio', opts: m.potCl.map(p => [p.id, p.label, p.id === 'R3' && Number(v.H) > 0 && Number(v.H) < 1750]), req: true, hint: Number(v.H) < 1750 && Number(v.H) > 0 ? t('Poteau rond Ø60 x 3 mm : à partir de 1 750 mm de hauteur.') : '' });
@@ -4413,11 +4445,12 @@ function productPdfIn(p) {
     if (v.m_marque) P.marque = v.m_marque;
     if (v.m_modele) P.modeleMot = v.m_modele;
     P.certif = v.m_certif === 'Oui';
-    P.serrure = (v.serMan || v.typeserrure) ? true : (ouv === 'motorisable' || ouv === 'motorise' ? false : undefined);
+    P.serrure = (v.serYN === 'Oui' || v.serMan || v.typeserrure) ? true : (v.serYN === 'Non' ? false : (ouv === 'motorisable' || ouv === 'motorise' ? false : undefined));
     P.serLoc = /locinox/i.test(v.serMan || '');   // coulissant/autoportant: caixa LOCINOX do ARC
     if (m.vantaux) P.vantaux = v.vantaux;   // decisão 11: 2v / tierce / mono
     if (ouv === 'motorise' && v.m_src === 'ferplay' && v.m_app) P.kit = String(v.m_app).split(' – ')[0];   // decisão 14: kit do tarif → MODEL no ARC
-    P.rail = v.rail;
+    P.rail = v.rail === 'sem' ? undefined : v.rail;
+    if (v.rail === 'sem') P.horsArc.push(t('Rail au sol') + ' : ' + t('Sans guide au sol'));
     if (v.crem) P.crem = /nylon/i.test(v.crem) ? 'nylon' : (/acier/i.test(v.crem) ? 'acier' : undefined);
     P.guidage = v.guidage; P.reception = v.reception;
     // escolhas sem caixa própria no ARC (ou que o ARC não distingue): Observations
@@ -4521,7 +4554,7 @@ function productPdfIn(p) {
 
 // ======================= cliente =======================
 const CLIENT_REQ = INTERNE ? ['typeDoc', 'societe', 'ref', 'adresse', 'livraison'] : ['typeDoc', 'societe', 'ref', 'contactNom', 'tel', 'email', 'rue', 'cp', 'ville', 'livraison'];
-const CLIENT_KEYS = ['societe', 'ref', 'ncde', 'drec', 'contactNom', 'tel', 'email', 'livrNom', 'adresse', 'rue', 'cp', 'ville', 'gps'];
+const CLIENT_KEYS = ['societe', 'ref', 'ncde', 'norc', 'drec', 'contactNom', 'tel', 'email', 'livrNom', 'adresse', 'rue', 'cp', 'ville', 'gps'];
 const CLIENT_LABEL = { typeDoc: 'Type de demande', societe: 'Société', ref: 'Référence client / chantier', contactNom: 'Nom du contact', tel: 'Téléphone', email: 'E-mail', rue: 'Adresse de livraison', adresse: 'Adresse de livraison', cp: 'Code postal', ville: 'Ville', livraison: 'Transport' };
 function readClient() {
   const c = {};
@@ -4881,7 +4914,9 @@ function renderStatus() {
   $('btnGoto').hidden = !(ce.length || bad || editErr || !S.products.length || (editing && !editing.v.code));
   markClient(ce);
 }
+function syncNorc() { const el = document.querySelector('#secClient [data-c="norc"]'), r = document.querySelector('input[name="c_typeDoc"]:checked'); if (el) el.hidden = !(r && r.value === 'commande'); }   // 05/11/2026 (Sónia): Nº do orçamento só em «Confirmation de commande»
 function renderAll() {
+  syncNorc();
   if (generated && Object.keys(generated).length) { const sn = snapshot(); for (const k of Object.keys(generated)) if (generated[k].snap !== sn) delete generated[k]; }
   renderProducts(); renderEditor(); renderSend(); renderStatus();
 }
@@ -4981,5 +5016,6 @@ setLang(lang0);
 // demonstração para testes (só na versão de teste): #demo abre o exemplo com o 1.º produto em edição
 if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdit(Number(location.hash.slice(5)) || 0); if (location.hash.endsWith('x')) gotoMissing(); }
 </script>
+
 </body>
 </html>
