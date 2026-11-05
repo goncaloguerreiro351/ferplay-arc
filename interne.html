@@ -1284,6 +1284,7 @@ viewBox="0 0 17206.5 4581.43"
     const ctx = doc.context, N = PDFName.of('N'), AP = PDFName.of('AP');
     for (const f of form.getFields()) {
       if (!(f instanceof LIB.PDFRadioGroup || f instanceof LIB.PDFCheckBox)) continue;
+      if (f instanceof LIB.PDFRadioGroup && f.enableOffToggling) { try { f.enableOffToggling(); } catch (e) { } }   // 05/11/2026 (Gonçalo): as cruzes podem retirar-se (clicar outra vez na caixa marcada)
       for (const w of f.acroField.getWidgets()) {
         const ap = w.dict.lookup(AP), n = ap && ap.lookup ? ap.lookup(N) : null;
         if (!n || !n.keys) continue;
@@ -3045,7 +3046,7 @@ function guidageOptions(m, v) {
   const lim = m.code === 'INSMAUA4' ? L <= 8000 : L < 8000;
   if (lim) return all; if (L < 10000) return all.slice(1); return ['Portique'];
 }
-function receptionOptions(v) { const L = Number(v.L) || 0; return L >= 10000 ? ['Portique'] : ['Simple', 'Portique', 'Sur mur ou pilier existant']; }
+function receptionOptions(v) { const L = Number(v.L) || 0; return L >= 10000 && !INTERNE ? ['Portique'] : ['Simple', 'Portique', 'Sur mur ou pilier existant']; }   // 05/11/2026: na versão interna não se bloqueia (um orçamento do Chiffreur de 12 m traz poteau de réception)
 function cremOptions(m, v) {
   const L = Number(v.L) || 0;
   if (m.code === 'INSTCOACC0') return m.crem;           // C120: nylon ou sans
@@ -3124,22 +3125,22 @@ function fieldsForAll(m, v) {
   // 03/11/2026 (testes internos do Ferro): com poteaux/portique escolhidos pergunta-se sempre a fixação (à visser / à sceller) e a trappe de visite
   const SG = ['Simple', 'Portique'];
   const hasPotApp = ['battant', 'coulissant', 'autoportant', 'portillon'].includes(m.kind) && (v.potindus === 'Avec poteaux' || v.potca5 === '150' || v.potca5 === '200' || SG.includes(v.guidage) || SG.includes(v.reception));
-  if (m.guidage) {
-    add({ k: 'guidage', sec: 'Poteaux', label: 'Poteaux de guidage', type: 'radio', opts: guidageOptions(m, v), req: true });
-    add({ k: 'reception', sec: 'Poteaux', label: 'Poteaux de réception', type: 'radio', opts: receptionOptions(v), req: true });
+  // 05/11/2026 (Gonçalo): na versão interna, coulissants/autoportantes mostram sempre guidage / réception e rail (facultativos), porque o orçamento do Chiffreur os pode trazer mesmo quando o catálogo os dá como inexistentes (ex.: C200)
+  if (m.guidage || (INTERNE && ['coulissant', 'autoportant'].includes(m.kind))) {
+    add({ k: 'guidage', sec: 'Poteaux', label: 'Poteaux de guidage', type: 'radio', opts: guidageOptions(m, v), req: !!m.guidage });
+    add({ k: 'reception', sec: 'Poteaux', label: 'Poteaux de réception', type: 'radio', opts: receptionOptions(v), req: !!m.guidage });
   }
   // Ferro (Gonçalo, 22/10/2026): os pilares têm a altura H + 90 mm, ou H + 130 mm com lisse défensive; o resto do Ferro é analisado, sem regras
   if (Number(v.H) && ['battant', 'coulissant', 'autoportant', 'portillon'].includes(m.kind) && (v.potindus === 'Avec poteaux' || v.potca5 === '150' || v.potca5 === '200' || v.guidage === 'Simple' || v.reception === 'Simple')) {
     const lis = (m.options || []).some(o => /lisse défensive/i.test(o.label) && v['o' + o.id]);
     // Gonçalo (03/11/2026): Industriel e Habitat iguais, todos os tipos: H + 90, e H + 130 com lisse défensive; à sceller soma-se o chumbamento (+ 500 mm sob a terra).
     // A altura vem sugerida mas é sempre editável e facultativa (há exceções às regras).
-    const scel = v0.fixPot === 'À sceller' || v0.potFix === 'sceller', dPot = (lis ? 130 : 90) + (scel ? 500 : 0);
-    const sugP = String(Number(v.H) + dPot);
-    if (!v0.potHx || v0.potHx === v0.potHSug) v0.potHx = sugP;
-    v0.potHSug = sugP;
-    add({ k: 'potHx', sec: 'Poteaux', label: 'Hauteur des poteaux', type: 'number', unit: 'mm', req: false, min: 0, max: 9999, hard: true, hint: tf('Suggestion automatique : hauteur + {d} mm ; vous pouvez la modifier.', { d: dPot }) + (scel ? ' ' + t('(dont 500 mm de scellement)') : '') });
+    // 05/11/2026 (Gonçalo): a altura dos pilares NUNCA se preenche nem se sugere (só se vê no desenho); o campo existe, é facultativo e fica em branco
+    if (v0.potHSug && v0.potHx === v0.potHSug) delete v0.potHx;   // limpa valores automáticos de rascunhos antigos
+    delete v0.potHSug;
+    add({ k: 'potHx', sec: 'Poteaux', label: 'Hauteur des poteaux', type: 'number', unit: 'mm', req: false, min: 0, max: 9999, hard: true });
     if (!m.potca5 && (v0.potindus === 'Avec poteaux' || v.guidage === 'Simple' || v.reception === 'Simple')) add({ k: 'potSec', sec: 'Poteaux', label: 'Section des poteaux', type: 'select', opts: [['', '—'], ['80', '80 x 80'], ['100', '100 x 100'], ['120', '120 x 120'], ['150', '150 x 150'], ['200', '200 x 200']], req: false });
-  } else if (v0.potHx && v0.potHx === v0.potHSug) { delete v0.potHx; delete v0.potHSug; }
+  } else if (v0.potHSug) { if (v0.potHx === v0.potHSug) delete v0.potHx; delete v0.potHSug; }
   if (hasPotApp) {
     add({ k: 'fixPot', sec: 'Poteaux', label: 'Fixation des poteaux', type: 'radio', opts: m.fixPoteaux || ['À visser', 'À sceller'], req: true });
     // 05/11/2026 (feedback interno): trappe de visite pré-preenchida (alterável): portillon ou abertura manual = Non; motorisé / motorisable = Oui
@@ -3147,7 +3148,7 @@ function fieldsForAll(m, v) {
     if (trDef && (v0.trappe === undefined || v0.trappe === '' || v0.trappe === v0.trappeAuto)) { v0.trappe = trDef; v0.trappeAuto = trDef; }
     add({ k: 'trappe', sec: 'Poteaux', label: 'Trappe de visite', type: 'radio', opts: ['Oui', 'Non'], req: true });
   }
-  if (m.rail) add({ k: 'rail', sec: 'Poteaux', label: 'Rail au sol', type: 'radio', opts: [['visser', 'À visser (tôle pliée 4 × 75 mm)'], ['sceller', 'À sceller (profil oméga 55 × 55)'], ['sem', 'Sans guide au sol']], req: true });   // 05/11/2026 (Sónia, A45): também sem guia no chão
+  if (m.rail || (INTERNE && m.kind === 'coulissant')) add({ k: 'rail', sec: 'Poteaux', label: 'Rail au sol', type: 'radio', opts: [['visser', 'À visser (tôle pliée 4 × 75 mm)'], ['sceller', 'À sceller (profil oméga 55 × 55)'], ['sem', 'Sans guide au sol']], req: !!m.rail });   // 05/11/2026 (Sónia, A45): também sem guia no chão
   if (m.kind === 'cloture') {
     if (m.gamme === 'st') {
       add({ k: 'potType', sec: 'Poteaux', label: 'Poteaux', type: 'radio', opts: m.potCl.map(p => [p.id, p.label, p.id === 'R3' && Number(v.H) > 0 && Number(v.H) < 1750]), req: true, hint: Number(v.H) < 1750 && Number(v.H) > 0 ? t('Poteau rond Ø60 x 3 mm : à partir de 1 750 mm de hauteur.') : '' });
@@ -3696,8 +3697,8 @@ function fieldsHab(m, v) {
       const mainS = ['100/100', '120/120', '150/150', '200/200'], secsF = [...mainS.filter(x => pt.sections.includes(x)), ...pt.sections.filter(x => !mainS.includes(x))];
       add({ k: 'potSec', sec, label: 'Section des poteaux', type: 'select', opts: secsF.map(x => [x, x]), req: true });
       { const base = Number(v.H) || 0, dl = (v.fo_ld ? 130 : 90) + (v.potFix === 'sceller' ? 500 : 0);   // 05/11/2026: à sceller soma 500 mm de chumbamento (como no Industriel)
-        if (base) { const sug = String(base + dl); if (!v.potH || v.potH === v.potHSug) v.potH = sug; v.potHSug = sug; } else if (v.potH && v.potH === v.potHSug) { delete v.potH; delete v.potHSug; }
-        add({ k: 'potH', sec, label: 'Hauteur des poteaux', type: 'number', unit: 'mm', req: false, min: 0, max: 9999, hard: true, hint: base ? tf('Suggestion automatique : hauteur + {d} mm ; vous pouvez la modifier.', { d: dl }) : '' }); }
+        if (v.potHSug) { if (v.potH === v.potHSug) delete v.potH; delete v.potHSug; }   // 05/11/2026 (Gonçalo): a altura dos pilares nunca se preenche nem se sugere (só se vê no desenho)
+        add({ k: 'potH', sec, label: 'Hauteur des poteaux', type: 'number', unit: 'mm', req: false, min: 0, max: 9999, hard: true }); }
       // quantidade e posição de cada poteau: o ARC não tem caixas para isto, vão para as Observations
       for (const [k, lab, oris] of [['potS', 'Poteaux de soutien', null], ['potG', 'Poteau de guidage', [['EXTERIEUR', 'Extérieur'], ['INTERIEUR', 'Intérieur']]], ['potR', 'Poteau de réception', [['FRONTAL', 'Frontal'], ['LATERAL', 'Latéral']]]]) {
         if (v[k] === 'POTEAU') {
@@ -4255,7 +4256,6 @@ function fieldsAluCl(m, v) {
   add({ k: 'potType', sec: 'Poteaux', label: 'Poteaux', type: 'radio', opts: [['C80', 'Poteaux carrés 80x80 (aluminium)'], ['R60', 'Poteaux ronds Ø60 x 3 (aluminium)']], req: true });
   add({ k: 'potN', sec: 'Poteaux', label: 'Nombre de poteaux', type: 'number', req: true, min: 1, max: 9999, hard: true, hint: t('En principe : nombre de panneaux + 1.') });
   add({ k: 'potFix', sec: 'Poteaux', label: 'Fixation des poteaux', type: 'radio', opts: [['sceller', 'À sceller'], ['visser', 'À visser']], req: true });
-  if (Number(v.H) && v.potFix === 'sceller') add({ k: 'potHinfo', sec: 'Poteaux', type: 'info', text: tf('Hauteur des poteaux : {h} mm (H + {d} mm).', { h: fmt(Number(v.H) + 500), d: 500 }) });
   if (m.code === 'ALUI:ULY2' ||m.code === 'ALUI:CAN2') add({ k: 'bouchons', sec: 'Options – équipements', label: 'Bouchons', type: 'select', opts: [['', 'Aucun'], ...(m.code === 'ALUI:ULY2' ? [['n14', 'Sachet de 14 bouchons noirs non montés'], ['m14', '14 bouchons montés en usine']] : [['n26', 'Sachet de 26 bouchons non montés'], ['m26', '26 bouchons montés en usine']])], wide: true });
   if (m.code === 'ALUI:ULY2') add({ k: 'biseau', sec: 'Options – équipements', label: 'Coupe biseautée en partie haute', type: 'check' });
   add({ k: 'coul', sec: 'Finition', label: 'Couleur', type: 'select', opts: [...m.couleurs.map(c => [c, `${c} – ${t(COLORS[c] || '')}`]), ['__autre', 'Autre RAL (saisie manuelle)']], req: true });
@@ -4419,7 +4419,7 @@ function aluProductPdf(p, m, v0, F, warnings) {
   if (m.kind === 'cloture') {
     P.potFix = v.potFix;
     const pt = { C80: 'Poteaux carrés 80x80 (aluminium)', R60: 'Poteaux ronds Ø60 x 3 (aluminium)' }[v.potType];
-    if (pt) P.horsArc.push(t(pt) + (v.potN ? ' × ' + v.potN : '') + (Number(v.H) && v.potFix === 'sceller' ? ' ; ' + tf('Hauteur des poteaux : {h} mm (H + {d} mm).', { h: fmt(Number(v.H) + 500), d: 500 }) : ''));
+    if (pt) P.horsArc.push(t(pt) + (v.potN ? ' × ' + v.potN : ''));
     if (v.barType) nota('Barreaux', { ronds: 'Tubes ronds Ø25', carres: 'Tubes carrés 25x25' }[v.barType]);
     if (v.bouchons) P.horsArc.push(t({ n14: 'Sachet de 14 bouchons noirs non montés', m14: '14 bouchons montés en usine', n26: 'Sachet de 26 bouchons non montés', m26: '26 bouchons montés en usine' }[v.bouchons]));
     if (v.biseau) P.horsArc.push(t('Coupe biseautée en partie haute'));
@@ -4451,7 +4451,7 @@ function aluProductPdf(p, m, v0, F, warnings) {
   if (m.fam === '45') { P.guidage = withPot ? v.guidage : undefined; P.reception = withPot ? v.reception : undefined; if (withPot) P.section = '100'; }
   if (withPot) P.potFix = v.fixPot || 'sceller';        // decisão 44.2: «à sceller» por defeito (tarif p.213–222)
   else P.potFix = 'visser';                              // sem poteaux: fixação por platines à visser (pivots/gonds sobre platines)
-  if (withPot && P.potFix === 'sceller' && H) P.potH = H + 500;   // tarif: poteaux «plus 500 mm de scellement»
+  // 05/11/2026 (Gonçalo): sem altura dos pilares automática (só se vê no desenho)
   P.trappe = !!v.trappe;
   if (m.kind === 'coulissant') { P.rail = v.rail; if (v.cremNylon) P.crem = 'nylon'; }
   if (m.fam === '45' && withPot) { const R = aluGuidRule(m, v); if (R && R.g2 && v.guidage === 'Portique') P.horsArc.push(t('2 portiques de guidage (tarif)')); }
@@ -4529,11 +4529,8 @@ function fieldsPieces(m, v) {
     const s = lab('pot'); qt('pot', s); sec('pot'); fix('pot', [['sceller', 'À sceller'], ['visser', 'À visser']], true);
     // hauteur hors sol → hauteur totale = hors sol + 500 mm de scellement (se à sceller); sugerida e sempre editável (Gonçalo, 05/11/2026)
     num('pot_Hs', s, 'Hauteur hors sol');
-    const sug = Number(v.pot_Hs) > 0 ? String(Number(v.pot_Hs) + (v.pot_fix === 'sceller' ? 500 : 0)) : '';
-    if (sug && (!v.pot_H || v.pot_H === v.pot_Hsug)) v.pot_H = sug;
-    if (!sug && v.pot_H && v.pot_H === v.pot_Hsug) delete v.pot_H;
-    v.pot_Hsug = sug;
-    num('pot_H', s, 'Hauteur totale du poteau', { req: true, hint: sug ? tf('Suggestion automatique : hauteur hors sol + {d} mm ; vous pouvez la modifier.', { d: v.pot_fix === 'sceller' ? 500 : 0 }) + (v.pot_fix === 'sceller' ? ' ' + t('(dont 500 mm de scellement)') : '') : '' });
+    if (v.pot_Hsug) { if (v.pot_H === v.pot_Hsug) delete v.pot_H; delete v.pot_Hsug; }   // 05/11/2026 (Gonçalo): nunca se sugere nem preenche a altura; facultativa
+    num('pot_H', s, 'Hauteur totale du poteau', { req: false });
     add({ k: 'pot_trous', sec: s, label: 'Trous de fixation (ex. fixation murale à 15 cm du haut)', type: 'text', wide: true }); obs('pot', s);
   }
   if (on('port')) { const s = lab('port'); qt('port', s); sec('port'); num('port_L', s, 'Largeur entre poteaux'); num('port_H', s, 'Hauteur', { req: true }); fix('port', [['sceller', 'À sceller'], ['visser', 'À visser']]); add({ k: 'port_trous', sec: s, label: 'Trous de fixation (ex. fixation murale à 15 cm du haut)', type: 'text', wide: true }); obs('port', s); }
@@ -4862,7 +4859,7 @@ function productPdfIn(p) {
     else P.horsArc.push(full);   // sem caixa no ARC rev 01.26: vai para «Observations»
   }
   const hv = v.H || v.Hin2 || v.Hin3, dims = v.L && hv ? ` – ${fmt(v.L)} × ${fmt(hv)}` : (v.H ? ` – H ${fmt(v.H)}` : '');
-  if (['battant', 'coulissant', 'autoportant', 'portillon'].includes(m.kind) && Number(v.H)) P.potH = Number(v.potHx) > 0 ? Number(v.potHx) : Number(v.H) + (A.lisse ? 130 : 90) + (P.potFix === 'sceller' ? 500 : 0);   // pilares do Ferro (Industriel e Habitat, 03/11/2026): H + 90, H + 130 com lisse défensive, + 500 de chumbamento à sceller; editável
+  if (['battant', 'coulissant', 'autoportant', 'portillon'].includes(m.kind) && Number(v.H)) P.potH = Number(v.potHx) > 0 ? Number(v.potHx) : 0;   // pilares do Ferro (Industriel e Habitat, 03/11/2026): H + 90, H + 130 com lisse défensive, + 500 de chumbamento à sceller; editável
   if (p.indef) P.modele = `${t('Modèle')} ${t('à définir')} (${t(m.gamme === 'co' ? 'Collectif' : m.gamme === 'sm' ? 'Industriel sur mesure' : 'Industriel standard')})`;
   // decisão 7: a série (média/lourde) vai para MODELE no ARC e para as Observations, para os desenhadores (o ARC é em francês: texto fixo)
   if (serie) { P.modele = `${m.label} série ${serie === 'lourde' ? 'lourde' : 'média'}`; P.horsArc.push(`Série A45 autoporté : ${serie === 'lourde' ? 'lourde (largeur > 6 000 mm)' : 'média (largeur ≤ 6 000 mm)'}`); }
@@ -5511,6 +5508,10 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
       const it = L.findIndex(s => /^Transport\s*:/i.test(s));
       if (it >= 0) {
         if (/sur chantier/i.test(L[it])) out.livraison = 'chantier';
+        // «Transport: Chemin des Maures»: o valor é a morada (quando não é «Au dépôt», «Sur chantier» nem «Lieu de livraison»)
+        for (let k = it; k < L.length && !/^(Total HT|Descriptif|P\.U)/i.test(L[k]); k++) { const mt = L[k].match(/^Transport\s*:\s*(.+)$/i); if (mt && !/^(Au d[ée]p[ôo]t|Sur chantier|Lieu de livraison)/i.test(mt[1]) && !(out.address && out.address.length)) out.address = [mt[1].replace(/\s+\d+[.,]\d{2}$/, '').trim()]; }
+        const ie = L.findIndex(s => /^Transport\s*:\s*$/i.test(s));   // «Transport:» sozinho: a morada de entrega vem nas linhas seguintes
+        if (ie >= 0 && !(out.address && out.address.length)) { const adr = []; for (let k = ie + 1; k < L.length && !/^(Total HT|Descriptif|P\.U)/i.test(L[k]) && adr.length < 6; k++) if (L[k]) adr.push(L[k]); out.address = adr; }
         const il = L.findIndex(s => /^Transport\s*:\s*Lieu de livraison/i.test(s));
         if (il >= 0) {   // as linhas da morada ficam entre as linhas «Transport:» (o PDF as intercala): apanha-se tudo até ao «Total HT»
           const adr = []; for (let k = it + 1; k < L.length && !/^(Total HT|Descriptif|P\.U)/i.test(L[k]) && adr.length < 8; k++) { if (/^Transport\s*:|^d[ée]chargement\)/i.test(L[k])) continue; adr.push(L[k]); }
@@ -5534,7 +5535,7 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
     const tl = L.find(s => /^Transport\s*:/i.test(s)); if (tl) out.transport = tl;
     // blocos de produto: começam num cabeçalho de modelo e acabam no «Total HT» (as páginas de resumo e de anexos ficam de fora)
     const heads = [];
-    L.forEach((s, i) => { if (/^Mod[èe]le Industriel\s*:/i.test(s) || /^Habitat\s*>/i.test(s)) heads.push(i); });
+    L.forEach((s, i) => { if (/^Mod[èe]le (Industriel|Collectif|Standard|Habitat)\s*:/i.test(s) || /^Habitat\s*>/i.test(s)) heads.push(i); });
     for (const h of heads) {
       let e = L.findIndex((s, i) => i > h && (/^Total HT/i.test(s) || /^<</.test(s)));
       if (e < 0) e = L.length;
@@ -5582,11 +5583,11 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
     const head = prod.head, kl = nz(prod.kindLine);
     let kind = /autoport/.test(kl) ? 'autoportant' : /coulissant/.test(kl) ? 'coulissant' : /portillon/.test(kl) ? 'portillon' : /cl[oô]ture|cloture/.test(kl) ? 'cloture' : /vantaux|battant|portail/.test(kl) ? 'battant' : '';
     let cands = [], label = '', gamme = '';
-    const mi = head.match(/^Mod[èe]le Industriel\s*:\s*(.+)$/i);
+    const mi = head.match(/^Mod[èe]le (?:Industriel|Collectif|Standard)\s*:\s*(.+)$/i), isCo = /^Mod[èe]le Collectif/i.test(head);   // 05/11/2026: também «Modèle Collectif : A49C»
     if (mi) {
       label = mi[1].trim();
       cands = Object.entries(CAT).filter(([, m]) => !m.hab && !m.alu && nz(m.label) === nz(label) && (!kind || m.kind === kind));
-      const pref = { st: 0, sm: 1, co: 2 }; cands.sort((a, b) => (pref[a[1].gamme] ?? 9) - (pref[b[1].gamme] ?? 9));
+      const pref = isCo ? { co: 0, sm: 1, st: 2 } : { st: 0, sm: 1, co: 2 }; cands.sort((a, b) => (pref[a[1].gamme] ?? 9) - (pref[b[1].gamme] ?? 9));
       if (cands.length && ['coulissant', 'autoportant'].includes(kind) === false && !kind) kind = cands[0][1].kind;
       return { code: cands.length ? cands[0][0] : '', label, kind, tried: cands.length };
     }
@@ -5673,7 +5674,13 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
         if (f.type === 'check') { const lt = toks(f.label || ''); const hit = flagsAll.find(s => { const st = toks(s); return st.length >= 2 && cover(lt, st) >= 0.8 && cover(st, lt) >= 0.6; }); if (hit) { setv(f.k, true, hit); changed = true; } }
         if (/^pq\d+X\d+$/.test(f.k)) { for (const h of flagsAll) { const mm = h.match(/(\d+)\s*fois\s*(\d{2,3})\s*x\s*(\d{2,3})/i); if (mm && f.k.toUpperCase() === 'PQ' + mm[2] + 'X' + mm[3]) { setv(f.k, mm[1], h); changed = true; break; } } }
         if (f.k === 'potMode') { const h = flagsAll.find(s => /poteaux?/.test(nz(s)) && /sceller|visser/.test(nz(s))); if (h) { setv('potMode', /sceller/.test(nz(h)) ? 'sceller' : 'visser', h + ' (quantidade a confirmar)'); changed = true; } }
+        if (f.k === 'potindus' && !v.potindus && flagsAll.some(s => /^sans poteaux/i.test(s))) { setv('potindus', 'Sans poteaux', 'Sans poteaux'); changed = true; }
         if (f.k === 'potindus') { const h = flagsAll.find(s => /poteaux?\b.*(sceller|visser|platine)|(sceller|visser).*poteaux?/i.test(nz(s)) || /^poteaux? (a|à) (sceller|visser)/i.test(s)); if (h) { setv('potindus', 'Avec poteaux', h); changed = true; } }
+        // 05/11/2026: poteaux de guidage / réception, rail e fixação lidos do «Descriptif» (ex.: «Deux portiques de guidage sur platines… et un poteau de réception en tube 120x120»)
+        if (f.k === 'guidage' && !v.guidage) { const h = flagsAll.find(s => /portiques? de guidage/i.test(nz(s)) || /poteaux? de guidage/i.test(nz(s))); if (h) { const val = /portique/i.test(nz(h)) ? 'Portique' : 'Simple'; if (optList(f).some(o => o[0] === val)) { setv('guidage', val, h); changed = true; } } }
+        if (f.k === 'reception' && !v.reception) { const h = flagsAll.find(s => /(poteaux?|portiques?) de r[ée]ception/i.test(s) || /(poteaux?|portiques?) de reception/i.test(nz(s))); if (h) { const val = /portique de r[ée]ception/i.test(nz(h).replace('reception', 'réception')) ? 'Portique' : 'Simple'; if (optList(f).some(o => o[0] === val)) { setv('reception', val, h); changed = true; } } }
+        if (f.k === 'rail' && !v.rail) { const h = flagsAll.find(s => /rail au sol/i.test(nz(s))); if (h) { const val = /visser/i.test(nz(h)) ? 'visser' : (/sceller/i.test(nz(h)) ? 'sceller' : ''); if (val) { setv('rail', val, h); changed = true; } } }
+        if (f.k === 'fixPot' && !v.fixPot) { const h = flagsAll.find(s => /sur platines?/i.test(nz(s)) && /portique|poteau/i.test(nz(s))); if (h) { setv('fixPot', 'À visser', h); changed = true; } }
         if (f.k === 'fixPot') { const h = flagsAll.find(s => /poteaux?/.test(nz(s)) && /sceller|visser|platine/.test(nz(s))); if (h) { setv('fixPot', /sceller/.test(nz(h)) ? 'À sceller' : 'À visser', h); changed = true; } }   // «Sur platine» = à visser
         if (f.k === 'potSec' && !v.potSec) { const h = flagsAll.concat(prod.bullets).find(s => /poteau/i.test(s) && /(\d{2,3})\s*x\s*\1\b/i.test(s)); if (h) { const mm = h.match(/(\d{2,3})\s*x\s*\1\b/i); if (optList(f).some(o => String(o[0]).startsWith(mm[1]))) { const o = optList(f).find(o => String(o[0]).startsWith(mm[1])); setv('potSec', o[0], h); changed = true; } } }
       }
@@ -5730,6 +5737,8 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
     const d = parseDevis(lines);
     // encomendas de outros clientes: perfis por cliente (pdf_profiles.js)
     if (!d.isChiffreur && window.PdfProfiles) { const pr = window.PdfProfiles.analyse(lines, { findModel, fillProduct, parseBlock, finishProd, nz, toks }); if (pr) return pr; }
+    // 05/11/2026 (Gonçalo): há PDFs com o cabeçalho de outro logótipo/formato mas o corpo igual ao do Chiffreur: lê-se sempre, nunca se bloqueia
+    if (!d.isChiffreur && d.products.length) { d.isChiffreur = true; d.genericChiffreur = true; if (!d.societe && !d.client) { const iv = lines.findIndex(l => /Soci[ée]t[ée]\s*:/i.test(l.text)); if (iv >= 0) d.societe = lines[iv].text.replace(/^.*Soci[ée]t[ée]\s*:\s*/i, '').trim(); } }
     const products = d.products.map(prod => finishProd(prod));
     return { devis: d, products, lines };
   }
