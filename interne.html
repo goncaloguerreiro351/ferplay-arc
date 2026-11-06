@@ -5555,8 +5555,9 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
     // cabeçalho (pode ocupar várias linhas até ao preço)
     const KIND = /^(Portail|Portillon|Cl[ôo]ture|Garde|Coulissant)/i;
     let i = 1, head = (block[0] || '').replace(/(?:\s+\d+(?:[.,]\d+)?)+\s*€?$/, '');
-    while (i < block.length && !KIND.test(block[i]) && !/^(Forme|Largeur|Hauteur)/i.test(block[i])) { if (!isPrice(block[i])) head += (head ? ' ' : '') + block[i]; i++; }
-    head = head.replace(/\s*>\s*/g, ' > ').replace(/\s+/g, ' ').trim();
+    // 06/11/2026: o cabeçalho pode quebrar a meio («… > Clôtures >» / «CLÔTURES BRISE-VUE > CH5: Clôture pleine lames» / «200x20 Horizontales»): a linha de continuação que começa por «Clôture…» não é o tipo de produto
+    while (i < block.length && !((KIND.test(block[i]) && !/>/.test(block[i]) && !/>\s*$/.test(head)) && !/^[A-ZÉÈÔ ]{6,}\s*>/.test(block[i])) && !/^(Forme|Largeur|Hauteur)/i.test(block[i])) { if (!isPrice(block[i])) head += (head ? ' ' : '') + block[i]; i++; }
+    head = head.replace(/\s+\d{1,6}[.,]\d{2}(?=\s|$)/g, '').replace(/\s*>\s*/g, ' > ').replace(/\s+/g, ' ').trim();   // 06/11/2026: o preço pode ficar a meio do cabeçalho quebrado
     const prod = { head, kindLine: '', pairs: [], flags: [], bullets: [], options: [], raw: block.join('\n') };
     const rest = block.slice(i);
     let k = 0, inOptions = false, last = null;
@@ -5578,7 +5579,7 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
       }
       // linha de continuação (valor que quebrou) ou linha simples (marcador)
       if (last && !last.val && !/:/.test(s) && !/^•/.test(s)) { last.val = s; continue; }   // valor na linha seguinte
-      if (last && !/^[A-ZÉÈ][A-Za-zÉÈéèêà' /-]{2,40}$/.test(s) && /^[a-zàâéèêîôûç(0-9]/.test(s)) { last.val += ' ' + s; continue; }
+      if (last && !/^[A-ZÉÈ][A-Za-zÉÈéèêà' /-]{2,40}$/.test(s) && /^[a-zàâéèêîôûç(0-9]/.test(s) && !/^\d+\s+Poteaux?\b/i.test(s)) { last.val += ' ' + s; continue; }
       if (inOptions) prod.options.push(s); else prod.flags.push(s);
       last = null;
     }
@@ -5666,7 +5667,7 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
     return s;
   }
   function fillProduct(code, prod) {
-    const m = CAT[code]; const v = { qt: '1' }; const used = new Set(); const log = [];
+    const m = CAT[code]; const v = { qt: '1' }; const used = new Set(); const log = []; const extraUsed = new Set();
     const pairs = prod.pairs.filter(p => !/^(forme|option)/.test(nz(p.key)) || true);
     const setv = (k, val, src, extra) => { v[k] = val; if (extra) Object.assign(v, extra); log.push({ field: k, value: Array.isArray(val) ? val.join(',') : (val && typeof val === 'object' ? Object.entries(val).map(([a, b]) => a + ' × ' + b).join(', ') : String(val)), src }); };
     // marcadores soltos / linhas de texto: poteaux à sceller / à visser
@@ -5674,7 +5675,18 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
     for (let it = 0; it < 10; it++) {
       let changed = false; const F = fieldsFor(m, v);
       for (const f of F) {
-        if (f.type === 'qty' && f.items && f.items.length && !(v[f.k] && Object.keys(v[f.k]).length)) {   // décors / découpe laser: «Arbuste × 2, Oiseau»
+        // 06/11/2026: clôtures Habitat (CH1…CH7, Klolame…): um troço por produto, largura (entre maçonnerie), altura total (H1) e «N Poteaux d'extrémités / intermédiaires / d'angle avec <fixação>»
+        if (m.kind === 'cloture') {
+          if (f.k === 'nTr' && !v.nTr && optList(f).some(o => o[0] === '1')) { setv('nTr', '1', 'um troço por produto'); changed = true; }
+          if (f.k === 'L_1' && !v.L_1) { const p = prod.pairs.find(x => /^largeur/.test(nz(x.key))); const n = p && String(p.val).match(/(\d[\d\s]*?)\s*mm/i); if (n) { setv('L_1', n[1].replace(/\s/g, ''), p.key + ' : ' + p.val); used.add(p); changed = true; } }
+          if (f.k === 'H1_1' && !v.H1_1) { const p = prod.pairs.find(x => /^hauteur totale/.test(nz(x.key))); const n = p && String(p.val).match(/(\d[\d\s]*?)\s*mm/i); const val = n && n[1].replace(/\s/g, ''); if (val && optList(f).some(o => o[0] === val)) { setv('H1_1', val, p.key + ' : ' + p.val); used.add(p); changed = true; } }
+          if (/^pbv_(angle|extr|int)$/.test(f.k) && f.items && !(v[f.k] && Object.keys(v[f.k]).length)) {
+            const re = f.k === 'pbv_angle' ? /poteaux? d angle/ : f.k === 'pbv_extr' ? /poteaux? d extr/ : /poteaux? interm/; const q = {}, srcs = [];
+            for (const s of prod.flags.concat(prod.bullets)) { const ns = nz(s), mm = ns.match(/^(\d+) poteaux?/); if (!mm || !re.test(ns)) continue; const fix = ns.replace(/^.*\bavec\b/, ''); const it = f.items.map(x => ({ x, sc: cover(toks(x), toks(fix)) })).sort((a, b) => b.sc - a.sc)[0]; if (it && it.sc >= 0.6) { q[it.x] = (q[it.x] || 0) + Number(mm[1]); srcs.push(s); } }
+            if (Object.keys(q).length) { setv(f.k, q, srcs[0]); srcs.forEach(s => extraUsed.add(s)); changed = true; }
+          }
+        }
+        if (f.type === 'qty' && f.items && f.items.length && !(v[f.k] && Object.keys(v[f.k]).length) && !(m.kind === 'cloture' && /^pbv_/.test(f.k))) {   // décors / découpe laser: «Arbuste × 2, Oiseau»
           const lt = toks(f.label || '').filter(w => !/quantit/.test(w));
           const cand = prod.pairs.map(p => ({ txt: p.key + ' ' + p.val, key: p.key, val: p.val })).concat(prod.options.map(o => ({ txt: o, key: o.split(':')[0], val: o.includes(':') ? o.split(':').slice(1).join(':') : o })));
           for (const c of cand) {
@@ -5741,7 +5753,7 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
       } else optLeft.push(line);
     }
     // o que não foi percebido
-    const left = [], usedSrc = new Set(log.map(l => l.src));
+    const left = [], usedSrc = new Set(log.map(l => l.src).concat([...extraUsed]));
     for (const p of pairs) { const nk = nz(p.key); if (used.has(p) || IGNORE_KEYS.test(nk) || !p.val) continue; if (nk === 'finition' && INFO_FIN.test(p.val)) continue; if (/^forme/.test(nk) && v.forme) continue; left.push(p.key + ' : ' + p.val); }
     for (const l of optLeft) if (!usedSrc.has(l)) left.push('Option : ' + l);
     for (const f of prod.flags) if (f && f.length > 3 && /^[A-ZÀ-Ý0-9]/.test(f) && !usedSrc.has(f) && !/^(Portail|Portillon|Kit|KIT|Total|P\.U|Renfort|Descriptif)/i.test(f)) left.push(f);
