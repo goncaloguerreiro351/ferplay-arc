@@ -1908,6 +1908,7 @@ const I18N_SRC = {
   '2. Vos produits': ['2. Os seus produtos', '2. Your products'],
   '+ Ajouter un produit': ['+ Adicionar um produto', '+ Add a product'],
   'Aucun produit pour l’instant. Ajoutez un portail, un portillon ou une clôture.': ['Ainda não há produtos. Adicione um portão, um portão pedonal ou uma vedação.', 'No products yet. Add a gate, a pedestrian gate or a fence.'],
+  'Monter': ['Subir', 'Move up'], 'Descendre': ['Descer', 'Move down'],
   'Modifier': ['Modificar', 'Edit'], 'Dupliquer': ['Duplicar', 'Duplicate'], 'Supprimer': ['Apagar', 'Delete'],
   'Supprimer ce produit ?': ['Apagar este produto?', 'Delete this product?'],
   'Oui, supprimer': ['Sim, apagar', 'Yes, delete'],
@@ -5167,9 +5168,13 @@ function renderProducts() {
     return `<div class="pcard ${d.status === 'orange' ? 'orange' : ''} ${ed ? 'editing' : ''}">
       <div class="t">${i + 1}. ${esc(uiTitle(p))} <span class="chip ${st.errors.length ? 'bad' : (d.status === 'orange' ? 'warn' : 'ok')}" style="margin-left:6px">${t(st.errors.length ? 'À compléter' : (d.status === 'orange' ? 'À étudier' : 'Complet'))}</span></div>
       <div class="s">${m.pieces ? `${t(m.mat === 'alu' ? 'Aluminium' : 'Acier')} · ${t('Pièces détachées')} · ${t(p.v.pc_fiche === 'habitat' ? 'Habitat' : 'Industriel')}` : m.hab ? `${t(HAB_FAMILY_LABEL[m.famille] || '')} · ${esc(m.gammeNom)}` : m.alu ? `${t('Aluminium')} · ${t('Industriel')}` : `${t('Acier')} · ${t(m.gamme === 'co' ? 'Collectif' : m.gamme === 'sm' ? 'Industriel sur mesure' : 'Industriel standard')}`}${m.pieces ? '' : ` · ${t('Quantité')} ${esc(p.v.qt || '')}`}</div>
-      <div class="row"><button type="button" data-ed="${i}">${t('Modifier')}</button><button type="button" data-dup="${i}">${t('Dupliquer')}</button><button type="button" data-del="${i}">${t('Supprimer')}</button></div></div>`;
+      <div class="row"><button type="button" data-ed="${i}">${t('Modifier')}</button><button type="button" data-dup="${i}">${t('Dupliquer')}</button><button type="button" data-del="${i}">${t('Supprimer')}</button>${S.products.length > 1 ? `<button type="button" data-up="${i}" ${i === 0 ? 'disabled' : ''} title="${t('Monter')}" aria-label="${t('Monter')}">↑</button><button type="button" data-down="${i}" ${i === S.products.length - 1 ? 'disabled' : ''} title="${t('Descendre')}" aria-label="${t('Descendre')}">↓</button>` : ''}</div></div>`;
   }).join('');
   L.querySelectorAll('[data-ed]').forEach(b => b.onclick = () => startEdit(+b.dataset.ed));
+  // 06/11/2026 (pedido de cliente): mudar a ordem dos produtos (portão de correr, batente, portillon, grades…); a ordem da lista é a do PDF/ARC
+  const mover = (i, d) => { const j = i + d; if (j < 0 || j >= S.products.length) return; [S.products[i], S.products[j]] = [S.products[j], S.products[i]]; if (editing && editing.index >= 0) { if (editing.index === i) editing.index = j; else if (editing.index === j) editing.index = i; } renderAll(); save(); };
+  L.querySelectorAll('[data-up]').forEach(b => b.onclick = () => mover(+b.dataset.up, -1));
+  L.querySelectorAll('[data-down]').forEach(b => b.onclick = () => mover(+b.dataset.down, 1));
   L.querySelectorAll('[data-dup]').forEach(b => b.onclick = () => { const p = JSON.parse(JSON.stringify(S.products[+b.dataset.dup])); S.products.splice(+b.dataset.dup + 1, 0, p); renderAll(); save(); startEdit(+b.dataset.dup + 1); });
   L.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { const i = +b.dataset.del; b.outerHTML = `<span class="row"><b>${t('Supprimer ce produit ?')}</b><button type="button" data-yes="${i}">${t('Oui, supprimer')}</button><button type="button" data-no>${t('Non')}</button></span>`; L.querySelector('[data-yes]').onclick = () => { S.products.splice(i, 1); if (editing && editing.index === i) editing = null; renderAll(); save(); }; L.querySelector('[data-no]').onclick = renderProducts; });
 }
