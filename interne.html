@@ -1555,7 +1555,7 @@ viewBox="0 0 17206.5 4581.43"
       !FI && P.surMesure && P.tpl !== 'REGIONALE-SM' ? 'RÉGIONALE SUR MESURE' : '',
       p.obs,
       opts.length ? (P.surMesure ? '' : tr('Options') + ' : ') + opts.join(' ; ') : '',
-      p.warnings && p.warnings.length ? p.warnings.join(' ; ') : '',   // cada aviso já diz «à étudier par Ferplay»
+      // 05/11/2026 (Gonçalo): os avisos «à étudier» (medidas fora do catálogo…) já não vão para as Observations: ficam só no selo do ARC; senão fica tudo uma confusão
       p.pj && p.pj.length ? tr('Pièces jointes') + ' : ' + p.pj.join(', ') : ''
     ].filter(Boolean);
     fitField('Observations', obsTxt, 10, 6.5, 3.5);   // 05/11/2026 (Alu): observações em letra maior (até 10 pt), encolhe até caber
@@ -1736,6 +1736,7 @@ viewBox="0 0 17206.5 4581.43"
 // [pt, en]
 const I18N_SRC = {
   // cabeçalho, faixas, estado
+  'Pivots à roulement à billes : fixation': ['Pivots de rolamento de esferas: fixação', 'Ball-bearing pivots: fixing'],
   'Finition de la couleur': ['Finição da cor', 'Colour finish'],
   'Le formulaire contient déjà un autre client': ['O formulário já tem outro cliente', 'The form already contains another client'],
   'ses coordonnées ne sont pas remplacées. Utilisez « Recommencer » pour une nouvelle demande.': ['os dados dele não são substituídos. Use «Recomeçar» para um novo pedido.', 'its details are not replaced. Use « Start over » for a new request.'],
@@ -3232,8 +3233,8 @@ function fieldsForAll(m, v) {
     if (isVentouse(o) && v['o' + o.id]) add({ k: 'ventouseQt', sec: s, label: 'Nombre de ventouses', type: 'number', req: true, min: 1, max: 6, hard: true });
   }
   // 05/11/2026 (feedback interno): o A49C (e Collectif A49C) leva sempre pivot sur roulement à billes (de série): pergunta-se a fixação, facultativa
-  const pivStd = /^(INSMVAAC|COVAAC)$/.test(m.code);
-  if (pivStd || (m.options || []).some(o => /pivot roulement/i.test(o.label) && v['o' + o.id])) add({ k: 'pivFix', sec: 'Options – accessoires et équipements', label: 'Pivots : fixation', type: 'radio', opts: ['À visser', 'À sceller'], req: !pivStd });   // 03/11/2026 (testes internos)   // 03/11/2026 (testes internos)
+  const pivStd = /^(INSMVAAC|COVAAC|COPOA4)$/.test(m.code);
+  if (pivStd || (m.options || []).some(o => /pivot roulement/i.test(o.label) && v['o' + o.id])) add({ k: 'pivFix', sec: 'Options – accessoires et équipements', label: 'Pivots à roulement à billes : fixation', type: 'radio', opts: ['À visser', 'À sceller'], req: !pivStd });   // 03/11/2026 (testes internos)   // 03/11/2026 (testes internos)
   // 05/11/2026 (feedback interno): portões com chapa (tôle): finição facultativa texturado / mat (vai para as Observations)
   if ((m.options || []).some(o => /t[ôo]l/i.test(o.label) && !/prot/i.test(o.label) && v['o' + o.id])) add({ k: 'finTole', sec: 'Finitions', label: 'Finition de la tôle', type: 'radio', opts: ['Texturé', 'Mat'], req: false });
   add({ k: 'obs', sec: 'Observations', label: 'Observations pour ce produit (demandes particulières, modifications…)', type: 'textarea' });
@@ -4588,9 +4589,9 @@ function piecesProductPdf(p, m, v) {
   const trLab = { PEINT: 'peinture', GALVA: 'galva', GALVAPEINT: 'peinture + galva', BRUT: 'brut' }[v.trait] || '';
   const ral = String(v.ral || '').trim().replace(/^ral\s*/i, '');
   Q.trait = v.trait; Q.ral = ral; Q.ralTxt = ral ? `RAL ${ral}${v.fin ? ' ' + v.fin : ''}` : '';
-  Q.qt = nSel === 1 && qts.length === 1 ? String(qts[0]) : '';
+  Q.qt = '';   // 05/11/2026 (Gonçalo): o campo da quantidade do ARC não se preenche nas peças
   const fin = [trLab ? `traitement ${trLab}` : '', ral ? `RAL ${ral}` : '', v.fin ? v.fin.toLowerCase() : ''].filter(Boolean).join(' – ');
-  if (fin) lines.push('Finition : ' + fin);
+  // 05/11/2026 (Gonçalo): a finição (traitement / RAL / texturado) já vai nas caixas do ARC: não se repete nas Observations
   // 05/11/2026: a Fiche escolhida decide o ARC — Industriel (Fer battant / Alu ALU-INDUST-BATTANT) ou Habitat (Fer: CONF CDE FER - BATTANT - HABITAT; Alu: BATTANTS da gama escolhida)
   const fam = v.pc_fiche === 'habitat' ? 'habitat' : 'industriel';
   let tpl = '', gamNom = '';
@@ -4598,10 +4599,11 @@ function piecesProductPdf(p, m, v) {
     if (m.mat === 'fer') tpl = 'CONF CDE FER - BATTANT - HABITAT';
     else { const hmod = Object.values(CAT).find(x => x.hab && x.mat === 'alu' && x.kind === 'battant' && x.tpl && x.gamme === v.pc_gamme); if (hmod) { tpl = hmod.tpl; gamNom = hmod.gammeNom; } }
   }
-  const P = { modele: 'PIÈCES DÉTACHÉES', acc: {}, horsArc: [], pieces: Q, aluInd: m.mat === 'alu' && fam !== 'habitat', tpl: tpl || undefined };
+  const P = { modele: '',   // 05/11/2026 (Gonçalo): o campo «Modèle» fica vazio nas peças
+     acc: {}, horsArc: [], pieces: Q, aluInd: m.mat === 'alu' && fam !== 'habitat', tpl: tpl || undefined };
   if (gamNom) lines.unshift('Gamme : ' + gamNom);
   Q.finTxt = v.fin || '';
-  const obsTxt = ['PIÈCES DÉTACHÉES (sans portail complet) :', ...lines, v.obs].filter(Boolean).join('\n');
+  const obsTxt = [...lines, v.obs].filter(Boolean).join('\n');
   const { warnings } = validateProduct(m, v);
   return {
     title: `${t('Pièces détachées')} (${t(fam === 'habitat' ? 'Habitat' : 'Industriel')}) – ${shorts.join(', ')}`, status: warnings.length ? 'orange' : 'green', warnings: warnings.map(w => w.ui),
@@ -4727,7 +4729,7 @@ function ficheData(p, r) {
 function uiTitle(p) {
   const m = CAT[p.code], v = effV(p.v);
   if (m.pieces) return piecesProductPdf(p, m, p.v).title;
-  if (p.indef) { const d = v.L && v.H ? ` – ${fmt(v.L)} × ${fmt(v.H)}` : (v.H ? ` – H ${fmt(v.H)}` : ''); return `${t(KIND_SHORT[m.kind])} ${m.hab ? t(m.ldg ? m.groupeNom : m.groupeNom || m.label) : t('Modèle')} (${t('variante à définir')})${d}`; }
+  if (p.indef) { const d = v.L && v.H ? ` – ${fmt(v.L)} × ${fmt(v.H)}` : (v.H ? ` – H ${fmt(v.H)}` : ''); return `${t(KIND_SHORT[m.kind])} ${p.modeleNom || (m.hab ? t(m.ldg ? m.groupeNom : m.groupeNom || m.label) : t('Modèle'))} (${t('variante à définir')})${d}`; }
   const hv = v.H || v.Hin2 || v.Hin3, dims = v.L && hv ? ` – ${fmt(v.L)} × ${fmt(hv)}` : (v.H ? ` – H ${fmt(v.H)}` : '');
   return `${t(KIND_SHORT[m.kind])} ${m.ldg ? t(m.label) : m.label}${dims}`;
 }
@@ -4764,7 +4766,7 @@ function productPdfIn(p) {
     if (P.H2 != null) { const dm = details.find(d => d.title === t('Dimensions')); if (dm) dm.rows.push([t('H2 – hauteur au montant (hors gond)'), `${fmt(P.H2)} mm`], [t('H3 – hauteur à la flèche'), `${fmt(P.H3)} mm`]); }
     if (P.horsArc.length) details.push({ title: t('À reporter par Ferplay (pas de case dans la fiche)'), rows: P.horsArc.map(x => ['•', x]) });
     const hv = v.H || v.Hin2 || v.Hin3, dims = v.L && hv ? ` – ${fmt(v.L)} × ${fmt(hv)}` : '';
-    if (p.indef) { P.modele = `${m.groupeNom || m.label} – ${t('variante à définir')}`; P.modeleNom = P.modele; delete P.lames; delete P.montage; }   // a variante-base só serve para as regras: nada do que vem do nome dela vai para o ARC
+    if (p.indef) { P.modele = p.modeleNom || `${m.groupeNom || m.label} – ${t('variante à définir')}`; P.modeleNom = P.modele; delete P.lames; delete P.montage; }   // a variante-base só serve para as regras: nada do que vem do nome dela vai para o ARC
     return { title: p.indef ? uiTitle(p) : `${t(KIND_SHORT[m.kind])} ${m.ldg ? t(m.label) : m.label}${dims}`, status: warnings.length ? 'orange' : 'green', warnings: warnings.map(w => w.ui), v: { kind: m.kind, qt: v.qt, L: v.L, H: v.H, sens: v.sens }, pdf: P, details, obs: v.obs || '' };
   }
   // valores do ARC (semânticos; arc_pdf.js decide onde marcar em cada modelo rev 01.26)
@@ -4815,7 +4817,7 @@ function productPdfIn(p) {
   const arcKind = m.kind === 'autoportant' ? 'coulissant' : m.kind;
   const ARCBOX = { battant: ['serrCode', 'serrElec', 'dcyl', 'pompier', 'ventLoc', 'roue', 'bavolet'], portillon: ['serrCode', 'serrElec', 'dcyl', 'pompier', 'antipanique', 'tole1m', 'venus', 'baton', 'cable', 'bavolet'], coulissant: ['serrCode', 'dcyl', 'pompier', 'pmi', 'coffreM', 'bavolet', 'verrouSol'] };
   const flag = (k, full, val) => { if ((ARCBOX[arcKind] || []).includes(k)) A[k] = val || true; else P.horsArc.push(full); };
-  if (/^(INSMVAAC|COVAAC)$/.test(m.code)) { A.roulBilles = true; if (v.pivFix) A.pivFix = v.pivFix === 'À sceller' ? 'sceller' : 'visser'; }   // 05/11/2026: pivot sur roulement à billes de série no A49C
+  if (/^(INSMVAAC|COVAAC|COPOA4)$/.test(m.code)) { A.roulBilles = true; if (v.pivFix) A.pivFix = v.pivFix === 'À sceller' ? 'sceller' : 'visser'; }   // 05/11/2026: pivot sur roulement à billes de série no A49C
   for (const o of m.options || []) {
     const val = v['o' + o.id]; if (!val) continue;
     const lab = o.label.toLowerCase();
@@ -4860,9 +4862,9 @@ function productPdfIn(p) {
   }
   const hv = v.H || v.Hin2 || v.Hin3, dims = v.L && hv ? ` – ${fmt(v.L)} × ${fmt(hv)}` : (v.H ? ` – H ${fmt(v.H)}` : '');
   if (['battant', 'coulissant', 'autoportant', 'portillon'].includes(m.kind) && Number(v.H)) P.potH = Number(v.potHx) > 0 ? Number(v.potHx) : 0;   // pilares do Ferro (Industriel e Habitat, 03/11/2026): H + 90, H + 130 com lisse défensive, + 500 de chumbamento à sceller; editável
-  if (p.indef) P.modele = `${t('Modèle')} ${t('à définir')} (${t(m.gamme === 'co' ? 'Collectif' : m.gamme === 'sm' ? 'Industriel sur mesure' : 'Industriel standard')})`;
+  if (p.indef) P.modele = p.modeleNom || `${t('Modèle')} ${t('à définir')} (${t(m.gamme === 'co' ? 'Collectif' : m.gamme === 'sm' ? 'Industriel sur mesure' : 'Industriel standard')})`;
   // decisão 7: a série (média/lourde) vai para MODELE no ARC e para as Observations, para os desenhadores (o ARC é em francês: texto fixo)
-  if (serie) { P.modele = `${m.label} série ${serie === 'lourde' ? 'lourde' : 'média'}`; P.horsArc.push(`Série A45 autoporté : ${serie === 'lourde' ? 'lourde (largeur > 6 000 mm)' : 'média (largeur ≤ 6 000 mm)'}`); }
+  if (serie && !(p.indef && p.modeleNom)) { P.modele = `${m.label} série ${serie === 'lourde' ? 'lourde' : 'média'}`; P.horsArc.push(`Série A45 autoporté : ${serie === 'lourde' ? 'lourde (largeur > 6 000 mm)' : 'média (largeur ≤ 6 000 mm)'}`); }
   if (m.faceLos && v.faceLos) P.horsArc.push('Barreaux carrés 25x25 : ' + (v.faceLos === 'losange' ? 'en losange' : 'de face'));
   // Ferro standard (23/10/2026): ARC próprio (CONF CDE FER - <TIPO> - STANDARD, cria_arc_standard.py), só com o que estes modelos têm
   if (ARC_STD && m.gamme === 'st' && !p.indef) {
@@ -4883,7 +4885,7 @@ function productPdfIn(p) {
     P.horsArc = [];   // as opções têm caixa no ARC standard; as que não têm vão para as Observations em fillStd
   }
   return {
-    title: p.indef ? `${t(KIND_SHORT[m.kind])} ${t('Modèle')} ${t('à définir')}${dims}` : `${t(KIND_SHORT[m.kind])} ${m.label}${dims}`,
+    title: p.indef ? `${t(KIND_SHORT[m.kind])} ${p.modeleNom || (t('Modèle') + ' ' + t('à définir'))}${dims}` : `${t(KIND_SHORT[m.kind])} ${m.label}${dims}`,
     status: warnings.length ? 'orange' : 'green', warnings: warnings.map(w => w.ui),
     v: { kind: m.kind, qt: v.qt, L: m.kind === 'cloture' && m.gamme === 'st' ? '' : v.L, H: v.H, sens: v.sens },
     pdf: P, details, obs: v.obs || ''
@@ -5535,7 +5537,7 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
     const tl = L.find(s => /^Transport\s*:/i.test(s)); if (tl) out.transport = tl;
     // blocos de produto: começam num cabeçalho de modelo e acabam no «Total HT» (as páginas de resumo e de anexos ficam de fora)
     const heads = [];
-    L.forEach((s, i) => { if (/^Mod[èe]le (Industriel|Collectif|Standard|Habitat)\s*:/i.test(s) || /^Habitat\s*>/i.test(s)) heads.push(i); });
+    L.forEach((s, i) => { if (/^Mod[èe]le (Industriel|Collectif|Standard|Habitat)\s*:/i.test(s) || /^Habitat\s*>/i.test(s) || /^R[ée]gionale( sur mesure)?\s*>/i.test(s)) heads.push(i); });
     for (const h of heads) {
       let e = L.findIndex((s, i) => i > h && (/^Total HT/i.test(s) || /^<</.test(s)));
       if (e < 0) e = L.length;
@@ -5547,7 +5549,7 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
   function parseBlock(block) {
     // cabeçalho (pode ocupar várias linhas até ao preço)
     const KIND = /^(Portail|Portillon|Cl[ôo]ture|Garde|Coulissant)/i;
-    let i = 1, head = (block[0] || '').replace(/\s+\d+(?:[.,]\d+)?\s*€?$/, '');
+    let i = 1, head = (block[0] || '').replace(/(?:\s+\d+(?:[.,]\d+)?)+\s*€?$/, '');
     while (i < block.length && !KIND.test(block[i]) && !/^(Forme|Largeur|Hauteur)/i.test(block[i])) { if (!isPrice(block[i])) head += (head ? ' ' : '') + block[i]; i++; }
     head = head.replace(/\s*>\s*/g, ' > ').replace(/\s+/g, ' ').trim();
     const prod = { head, kindLine: '', pairs: [], flags: [], bullets: [], options: [], raw: block.join('\n') };
@@ -5592,6 +5594,11 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
       return { code: cands.length ? cands[0][0] : '', label, kind, tried: cands.length };
     }
     const segs = head.split('>').map(s => s.trim());
+    if (/^R[ée]gionale/i.test(head)) {   // 05/11/2026: «Régionale sur mesure > Aquitaine > Aquitaine» (gama > grupo > modelo)
+      label = segs[segs.length - 1] || ''; gamme = segs[0] || '';
+      cands = Object.entries(CAT).filter(([, m]) => m.hab && nz(m.gammeNom || '') === nz(gamme) && nz(m.label) === nz(label) && (!kind || m.kind === kind));
+      return { code: cands.length ? cands[0][0] : '', label, kind, tried: cands.length };
+    }
     label = segs[segs.length - 1] || ''; gamme = segs[3] || '';
     cands = Object.entries(CAT).filter(([, m]) => m.hab && nz(m.label) === nz(label) && (!kind || m.kind === kind) && (!gamme || nz(m.gammeNom || '') === nz(gamme) || true));
     if (cands.length > 1 && gamme) { const g = cands.filter(([, m]) => nz(m.gammeNom || '') === nz(gamme)); if (g.length) cands = g; }
@@ -5656,12 +5663,23 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
   function fillProduct(code, prod) {
     const m = CAT[code]; const v = { qt: '1' }; const used = new Set(); const log = [];
     const pairs = prod.pairs.filter(p => !/^(forme|option)/.test(nz(p.key)) || true);
-    const setv = (k, val, src, extra) => { v[k] = val; if (extra) Object.assign(v, extra); log.push({ field: k, value: Array.isArray(val) ? val.join(',') : String(val), src }); };
+    const setv = (k, val, src, extra) => { v[k] = val; if (extra) Object.assign(v, extra); log.push({ field: k, value: Array.isArray(val) ? val.join(',') : (val && typeof val === 'object' ? Object.entries(val).map(([a, b]) => a + ' × ' + b).join(', ') : String(val)), src }); };
     // marcadores soltos / linhas de texto: poteaux à sceller / à visser
     const flagsAll = prod.flags.concat(prod.bullets).concat(prod.pairs.map(p => p.key + ' : ' + p.val));
     for (let it = 0; it < 10; it++) {
       let changed = false; const F = fieldsFor(m, v);
       for (const f of F) {
+        if (f.type === 'qty' && f.items && f.items.length && !(v[f.k] && Object.keys(v[f.k]).length)) {   // décors / découpe laser: «Arbuste × 2, Oiseau»
+          const lt = toks(f.label || '').filter(w => !/quantit/.test(w));
+          const cand = prod.pairs.map(p => ({ txt: p.key + ' ' + p.val, key: p.key, val: p.val })).concat(prod.options.map(o => ({ txt: o, key: o.split(':')[0], val: o.includes(':') ? o.split(':').slice(1).join(':') : o })));
+          for (const c of cand) {
+            const kt = toks(c.key + ' ' + (c.val.length < 120 ? c.val : '')); if (!lt.length || cover(lt, kt) < 0.6) continue;
+            const q = {}; const parts = String(c.val).split(/[,;/]|\bet\b/i);
+            for (const part of parts) { const pt = toks(part); if (!pt.length) continue; const it = f.items.map(x => ({ x, sc: cover(toks(x), pt) })).sort((a, b) => b.sc - a.sc)[0]; if (it && it.sc >= 0.6) { const mq = part.match(/(\d+)\s*(?:x|×|fois)\b|\b(?:x|×)\s*(\d+)|\((\d+)\)|:\s*(\d+)\s*$/i); q[it.x] = mq ? Number(mq[1] || mq[2] || mq[3] || mq[4]) : 1; } }
+            if (Object.keys(q).length) { setv(f.k, q, c.txt); changed = true; break; }
+          }
+          continue;
+        }
         if (['info', 'qty', 'textarea'].includes(f.type)) continue;
         if (v[f.k] !== undefined && v[f.k] !== '') continue;
         // 1) pares «chave : valor»
@@ -5670,6 +5688,9 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
         if (best) { used.add(best.p); setv(f.k, best.r.val, best.p.key + ' : ' + best.p.val, best.r.extra); changed = true; continue; }
         // 2) campos de verificação ou de escolha cujo texto aparece como linha solta
         if (f.k === 'potca5') { const h = flagsAll.find(s => /poteaux?\s*(150|200)\s*x\s*(150|200)/i.test(s)), z = h && h.match(/(150|200)\s*x\s*(150|200)/i); if (z) { setv('potca5', z[1], h); changed = true; } else { const h2 = flagsAll.find(s => /sans poteaux/i.test(s)); if (h2) { setv('potca5', 'sans', h2); changed = true; } } }
+        // 05/11/2026: «Option : Arrêt latéral de blocage à sceller / à visser» (ou «Butée à sceller / à visser») → campo de abertura do ARC (2 arrêts avec blocage / butées d'arrêt)
+        if (f.k === 'arret' && !v.arret) { const lines = prod.options.concat(prod.flags, prod.pairs.map(p => p.key + ' ' + p.val)); let best = null, bs = 0.74; for (const o of optList(f)) { if (!o[0]) continue; const ot = toks(o[1]); for (const ln of lines) { const sc = cover(ot, toks(ln)); if (sc > bs) { bs = sc; best = { o, ln }; } } } if (best) { setv('arret', best.o[0], best.ln); changed = true; } }
+        if (f.k === 'm_src' && !v.m_src && prod.pairs.some(p => /^choix de la motorisation/.test(nz(p.key)))) { setv('m_src', 'ferplay', 'Choix de la motorisation'); changed = true; }
         if (f.k === 'vantaux' && prod.kindLine) { const tk = nz(prod.kindLine), vv = /tierc|inegaux/.test(tk) ? 'tierce' : (/mono/.test(tk) ? 'mono' : (/vantaux/.test(tk) ? '2v' : '')); if (vv) { setv('vantaux', vv, prod.kindLine); changed = true; } }
         if (f.type === 'check') { const lt = toks(f.label || ''); const hit = flagsAll.find(s => { const st = toks(s); return st.length >= 2 && cover(lt, st) >= 0.8 && cover(st, lt) >= 0.6; }); if (hit) { setv(f.k, true, hit); changed = true; } }
         if (/^pq\d+X\d+$/.test(f.k)) { for (const h of flagsAll) { const mm = h.match(/(\d+)\s*fois\s*(\d{2,3})\s*x\s*(\d{2,3})/i); if (mm && f.k.toUpperCase() === 'PQ' + mm[2] + 'X' + mm[3]) { setv(f.k, mm[1], h); changed = true; break; } } }
@@ -5723,12 +5744,32 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
   }
 
   // ------------------------------------------------------------------ 5. juntar tudo
+  // 05/11/2026 (Gonçalo): orçamentos do Chiffreur com modelos que ainda não estão no catálogo (Fuji, Neoquartz, Venise A…) nunca bloqueiam:
+  // usa-se uma variante-base da mesma família e tipo, marcada «à définir», e o nome real do modelo vai para o campo Modèle do ARC
+  function fallbackModel(prod, mm) {
+    const head = prod.head || ''; if (!/^(Mod[èe]le (Industriel|Collectif|Standard)\s*:|Habitat\s*>|R[ée]gionale)/i.test(head)) return null;
+    const kind = mm.kind || 'battant', segs = head.split('>').map(s => s.trim());
+    let cands, nome = '';
+    if (/^Habitat\s*>/i.test(head) || /^R[ée]gionale/i.test(head)) {
+      const mat = /acier|fer/i.test(segs[1] || '') ? 'fer' : 'alu';
+      cands = Object.values(CAT).filter(m => m.hab && m.mat === mat && m.kind === kind && !m.catalogueOnly);
+      cands.sort((a, b) => (/FLUVIALE/.test(b.gammeNom || '') ? 1 : 0) - (/FLUVIALE/.test(a.gammeNom || '') ? 1 : 0));
+      nome = segs[segs.length - 1] + (segs[3] && segs.length > 4 ? ' (' + segs[3] + ')' : '');
+    } else {
+      const mi = head.match(/:\s*(.+)$/); nome = mi ? mi[1].replace(/(?:\s+\d+(?:[.,]\d+)?)+\s*€?$/, '').trim() : '';
+      cands = Object.values(CAT).filter(m => !m.hab && !m.alu && !m.pieces && m.kind === kind);
+      cands.sort((a, b) => ({ sm: 0, st: 1, co: 2 }[a.gamme] ?? 9) - ({ sm: 0, st: 1, co: 2 }[b.gamme] ?? 9));
+    }
+    return cands.length ? { code: cands[0].code, nome: nome.toUpperCase() } : null;
+  }
   function finishProd(prod, mm) {
     mm = mm || findModel(prod);
+    let indef = false, modeleNom = '';
+    if (!mm.code) { const fb = fallbackModel(prod, mm); if (fb) { mm = Object.assign({}, mm, { code: fb.code }); indef = true; modeleNom = fb.nome; } }
     const r = mm.code ? fillProduct(mm.code, prod) : { v: {}, log: [], left: prod.pairs.map(p => p.key + ' : ' + p.val), optMatches: [] };
     const m = mm.code ? CAT[mm.code] : null;
     const errs = m ? validateProduct(m, r.v).errors : [];
-    return { head: prod.head, kindLine: prod.kindLine, model: mm, code: mm.code, mat: m && m.mat, fiche: m && m.fiche, v: r.v, log: r.log, left: r.left, missing: errs.map(e => e.ui || e.msg), raw: prod.raw };
+    return { head: prod.head, kindLine: prod.kindLine, model: mm, code: mm.code, indef, modeleNom, mat: m && m.mat, fiche: m && m.fiche, v: r.v, log: r.log, left: r.left, missing: errs.map(e => e.ui || e.msg), raw: prod.raw };
   }
   async function analyse(file) {
     const lines = await readLines(file);
@@ -5790,7 +5831,7 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
     if (!c.norc && d.devis) c.norc = d.devis;
     if (!c.typeDoc) c.typeDoc = 'commande';
     writeClient(c);
-    for (const p of sel) S.products.push({ mat: p.mat || 'fer', fiche: p.fiche || 'industriel', code: p.code, v: JSON.parse(JSON.stringify(p.v)) });
+    for (const p of sel) S.products.push(Object.assign({ mat: p.mat || 'fer', fiche: p.fiche || 'industriel', code: p.code, v: JSON.parse(JSON.stringify(p.v)) }, p.indef ? { indef: true, modeleNom: p.modeleNom } : {}));
     editing = null; generated = {}; renderAll(); save();
     document.getElementById('pdfPanel').hidden = true;
     const first = S.products.length - sel.length;

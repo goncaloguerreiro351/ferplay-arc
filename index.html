@@ -1555,7 +1555,7 @@ viewBox="0 0 17206.5 4581.43"
       !FI && P.surMesure && P.tpl !== 'REGIONALE-SM' ? 'RÉGIONALE SUR MESURE' : '',
       p.obs,
       opts.length ? (P.surMesure ? '' : tr('Options') + ' : ') + opts.join(' ; ') : '',
-      p.warnings && p.warnings.length ? p.warnings.join(' ; ') : '',   // cada aviso já diz «à étudier par Ferplay»
+      // 05/11/2026 (Gonçalo): os avisos «à étudier» (medidas fora do catálogo…) já não vão para as Observations: ficam só no selo do ARC; senão fica tudo uma confusão
       p.pj && p.pj.length ? tr('Pièces jointes') + ' : ' + p.pj.join(', ') : ''
     ].filter(Boolean);
     fitField('Observations', obsTxt, 10, 6.5, 3.5);   // 05/11/2026 (Alu): observações em letra maior (até 10 pt), encolhe até caber
@@ -1736,6 +1736,7 @@ viewBox="0 0 17206.5 4581.43"
 // [pt, en]
 const I18N_SRC = {
   // cabeçalho, faixas, estado
+  'Pivots à roulement à billes : fixation': ['Pivots de rolamento de esferas: fixação', 'Ball-bearing pivots: fixing'],
   'Finition de la couleur': ['Finição da cor', 'Colour finish'],
   'Le formulaire contient déjà un autre client': ['O formulário já tem outro cliente', 'The form already contains another client'],
   'ses coordonnées ne sont pas remplacées. Utilisez « Recommencer » pour une nouvelle demande.': ['os dados dele não são substituídos. Use «Recomeçar» para um novo pedido.', 'its details are not replaced. Use « Start over » for a new request.'],
@@ -3232,8 +3233,8 @@ function fieldsForAll(m, v) {
     if (isVentouse(o) && v['o' + o.id]) add({ k: 'ventouseQt', sec: s, label: 'Nombre de ventouses', type: 'number', req: true, min: 1, max: 6, hard: true });
   }
   // 05/11/2026 (feedback interno): o A49C (e Collectif A49C) leva sempre pivot sur roulement à billes (de série): pergunta-se a fixação, facultativa
-  const pivStd = /^(INSMVAAC|COVAAC)$/.test(m.code);
-  if (pivStd || (m.options || []).some(o => /pivot roulement/i.test(o.label) && v['o' + o.id])) add({ k: 'pivFix', sec: 'Options – accessoires et équipements', label: 'Pivots : fixation', type: 'radio', opts: ['À visser', 'À sceller'], req: !pivStd });   // 03/11/2026 (testes internos)   // 03/11/2026 (testes internos)
+  const pivStd = /^(INSMVAAC|COVAAC|COPOA4)$/.test(m.code);
+  if (pivStd || (m.options || []).some(o => /pivot roulement/i.test(o.label) && v['o' + o.id])) add({ k: 'pivFix', sec: 'Options – accessoires et équipements', label: 'Pivots à roulement à billes : fixation', type: 'radio', opts: ['À visser', 'À sceller'], req: !pivStd });   // 03/11/2026 (testes internos)   // 03/11/2026 (testes internos)
   // 05/11/2026 (feedback interno): portões com chapa (tôle): finição facultativa texturado / mat (vai para as Observations)
   if ((m.options || []).some(o => /t[ôo]l/i.test(o.label) && !/prot/i.test(o.label) && v['o' + o.id])) add({ k: 'finTole', sec: 'Finitions', label: 'Finition de la tôle', type: 'radio', opts: ['Texturé', 'Mat'], req: false });
   add({ k: 'obs', sec: 'Observations', label: 'Observations pour ce produit (demandes particulières, modifications…)', type: 'textarea' });
@@ -4611,7 +4612,7 @@ function ficheData(p, r) {
 function uiTitle(p) {
   const m = CAT[p.code], v = effV(p.v);
   if (m.pieces) return piecesProductPdf(p, m, p.v).title;
-  if (p.indef) { const d = v.L && v.H ? ` – ${fmt(v.L)} × ${fmt(v.H)}` : (v.H ? ` – H ${fmt(v.H)}` : ''); return `${t(KIND_SHORT[m.kind])} ${m.hab ? t(m.ldg ? m.groupeNom : m.groupeNom || m.label) : t('Modèle')} (${t('variante à définir')})${d}`; }
+  if (p.indef) { const d = v.L && v.H ? ` – ${fmt(v.L)} × ${fmt(v.H)}` : (v.H ? ` – H ${fmt(v.H)}` : ''); return `${t(KIND_SHORT[m.kind])} ${p.modeleNom || (m.hab ? t(m.ldg ? m.groupeNom : m.groupeNom || m.label) : t('Modèle'))} (${t('variante à définir')})${d}`; }
   const hv = v.H || v.Hin2 || v.Hin3, dims = v.L && hv ? ` – ${fmt(v.L)} × ${fmt(hv)}` : (v.H ? ` – H ${fmt(v.H)}` : '');
   return `${t(KIND_SHORT[m.kind])} ${m.ldg ? t(m.label) : m.label}${dims}`;
 }
@@ -4648,7 +4649,7 @@ function productPdfIn(p) {
     if (P.H2 != null) { const dm = details.find(d => d.title === t('Dimensions')); if (dm) dm.rows.push([t('H2 – hauteur au montant (hors gond)'), `${fmt(P.H2)} mm`], [t('H3 – hauteur à la flèche'), `${fmt(P.H3)} mm`]); }
     if (P.horsArc.length) details.push({ title: t('À reporter par Ferplay (pas de case dans la fiche)'), rows: P.horsArc.map(x => ['•', x]) });
     const hv = v.H || v.Hin2 || v.Hin3, dims = v.L && hv ? ` – ${fmt(v.L)} × ${fmt(hv)}` : '';
-    if (p.indef) { P.modele = `${m.groupeNom || m.label} – ${t('variante à définir')}`; P.modeleNom = P.modele; delete P.lames; delete P.montage; }   // a variante-base só serve para as regras: nada do que vem do nome dela vai para o ARC
+    if (p.indef) { P.modele = p.modeleNom || `${m.groupeNom || m.label} – ${t('variante à définir')}`; P.modeleNom = P.modele; delete P.lames; delete P.montage; }   // a variante-base só serve para as regras: nada do que vem do nome dela vai para o ARC
     return { title: p.indef ? uiTitle(p) : `${t(KIND_SHORT[m.kind])} ${m.ldg ? t(m.label) : m.label}${dims}`, status: warnings.length ? 'orange' : 'green', warnings: warnings.map(w => w.ui), v: { kind: m.kind, qt: v.qt, L: v.L, H: v.H, sens: v.sens }, pdf: P, details, obs: v.obs || '' };
   }
   // valores do ARC (semânticos; arc_pdf.js decide onde marcar em cada modelo rev 01.26)
@@ -4699,7 +4700,7 @@ function productPdfIn(p) {
   const arcKind = m.kind === 'autoportant' ? 'coulissant' : m.kind;
   const ARCBOX = { battant: ['serrCode', 'serrElec', 'dcyl', 'pompier', 'ventLoc', 'roue', 'bavolet'], portillon: ['serrCode', 'serrElec', 'dcyl', 'pompier', 'antipanique', 'tole1m', 'venus', 'baton', 'cable', 'bavolet'], coulissant: ['serrCode', 'dcyl', 'pompier', 'pmi', 'coffreM', 'bavolet', 'verrouSol'] };
   const flag = (k, full, val) => { if ((ARCBOX[arcKind] || []).includes(k)) A[k] = val || true; else P.horsArc.push(full); };
-  if (/^(INSMVAAC|COVAAC)$/.test(m.code)) { A.roulBilles = true; if (v.pivFix) A.pivFix = v.pivFix === 'À sceller' ? 'sceller' : 'visser'; }   // 05/11/2026: pivot sur roulement à billes de série no A49C
+  if (/^(INSMVAAC|COVAAC|COPOA4)$/.test(m.code)) { A.roulBilles = true; if (v.pivFix) A.pivFix = v.pivFix === 'À sceller' ? 'sceller' : 'visser'; }   // 05/11/2026: pivot sur roulement à billes de série no A49C
   for (const o of m.options || []) {
     const val = v['o' + o.id]; if (!val) continue;
     const lab = o.label.toLowerCase();
@@ -4744,9 +4745,9 @@ function productPdfIn(p) {
   }
   const hv = v.H || v.Hin2 || v.Hin3, dims = v.L && hv ? ` – ${fmt(v.L)} × ${fmt(hv)}` : (v.H ? ` – H ${fmt(v.H)}` : '');
   if (['battant', 'coulissant', 'autoportant', 'portillon'].includes(m.kind) && Number(v.H)) P.potH = Number(v.potHx) > 0 ? Number(v.potHx) : 0;   // pilares do Ferro (Industriel e Habitat, 03/11/2026): H + 90, H + 130 com lisse défensive, + 500 de chumbamento à sceller; editável
-  if (p.indef) P.modele = `${t('Modèle')} ${t('à définir')} (${t(m.gamme === 'co' ? 'Collectif' : m.gamme === 'sm' ? 'Industriel sur mesure' : 'Industriel standard')})`;
+  if (p.indef) P.modele = p.modeleNom || `${t('Modèle')} ${t('à définir')} (${t(m.gamme === 'co' ? 'Collectif' : m.gamme === 'sm' ? 'Industriel sur mesure' : 'Industriel standard')})`;
   // decisão 7: a série (média/lourde) vai para MODELE no ARC e para as Observations, para os desenhadores (o ARC é em francês: texto fixo)
-  if (serie) { P.modele = `${m.label} série ${serie === 'lourde' ? 'lourde' : 'média'}`; P.horsArc.push(`Série A45 autoporté : ${serie === 'lourde' ? 'lourde (largeur > 6 000 mm)' : 'média (largeur ≤ 6 000 mm)'}`); }
+  if (serie && !(p.indef && p.modeleNom)) { P.modele = `${m.label} série ${serie === 'lourde' ? 'lourde' : 'média'}`; P.horsArc.push(`Série A45 autoporté : ${serie === 'lourde' ? 'lourde (largeur > 6 000 mm)' : 'média (largeur ≤ 6 000 mm)'}`); }
   if (m.faceLos && v.faceLos) P.horsArc.push('Barreaux carrés 25x25 : ' + (v.faceLos === 'losange' ? 'en losange' : 'de face'));
   // Ferro standard (23/10/2026): ARC próprio (CONF CDE FER - <TIPO> - STANDARD, cria_arc_standard.py), só com o que estes modelos têm
   if (ARC_STD && m.gamme === 'st' && !p.indef) {
@@ -4767,7 +4768,7 @@ function productPdfIn(p) {
     P.horsArc = [];   // as opções têm caixa no ARC standard; as que não têm vão para as Observations em fillStd
   }
   return {
-    title: p.indef ? `${t(KIND_SHORT[m.kind])} ${t('Modèle')} ${t('à définir')}${dims}` : `${t(KIND_SHORT[m.kind])} ${m.label}${dims}`,
+    title: p.indef ? `${t(KIND_SHORT[m.kind])} ${p.modeleNom || (t('Modèle') + ' ' + t('à définir'))}${dims}` : `${t(KIND_SHORT[m.kind])} ${m.label}${dims}`,
     status: warnings.length ? 'orange' : 'green', warnings: warnings.map(w => w.ui),
     v: { kind: m.kind, qt: v.qt, L: m.kind === 'cloture' && m.gamme === 'st' ? '' : v.L, H: v.H, sens: v.sens },
     pdf: P, details, obs: v.obs || ''
