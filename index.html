@@ -108,6 +108,7 @@ footer { color: var(--muted); font-size: 12.5px; margin-top: 22px }
 .lang button[aria-pressed="true"] { background: var(--accent); color: #fff }
 header.top > div:last-child { order: 2; flex: 1 1 320px; min-width: 0 }
 @media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth } }
+.f.need input{outline:3px solid #e8a317;outline-offset:1px;background:#fff8e1}.f.need label{color:#a36a00;font-weight:700}
 .pdfpanel{border:1px solid var(--line);border-radius:10px;padding:12px;margin:10px 0;background:var(--surface)}
 .pdfhead{margin-bottom:8px}.pdfcard{margin:8px 0}.pdflog{margin:6px 0 0 18px;padding:0;font-size:13px}.pdflog .src{color:var(--muted)}
 #pdfBtn{flex:0 0 auto;white-space:nowrap;padding:8px 16px;border:0;border-radius:8px;background:var(--accent);color:#fff;font-weight:700;cursor:pointer;line-height:1.2}
@@ -1319,6 +1320,14 @@ viewBox="0 0 17206.5 4581.43"
         mk.delete(PDFName.of('BC')); mk.delete(PDFName.of('BG'));
         w.dict.delete(PDFName.of('BS')); w.dict.delete(PDFName.of('Border'));
       }
+      // 11/11/2026 (Gonçalo): em alguns leitores (Chrome/Edge…) um botão de rádio ligado NÃO se desliga com um clique (só o Adobe deixa). Para a cruz poder SEMPRE ser retirada à mão, todas as caixas passam a
+      // caixas de seleção (checkbox): sem bits Rádio / NoToggleToOff / RadiosInUnison; cada widget mantém o seu estado «ligado» e /Off, e o AS continua igual ao V
+      if (f instanceof LIB.PDFRadioGroup) {
+        const ff = f.acroField.getFlags();
+        f.acroField.dict.set(PDFName.of('Ff'), LIB.PDFNumber.of(ff & ~(32768 | 16384 | 33554432 | 65536)));
+        f.acroField.dict.delete(PDFName.of('Opt'));
+        const V = f.acroField.dict.lookup(PDFName.of('V')); if (!V) f.acroField.dict.set(PDFName.of('V'), PDFName.of('Off'));
+      }
     }
   }
   // letra do campo (multilinha) que encolhe de 16 pt até 5 pt conforme o número de linhas (inclui as quebradas pela largura)
@@ -1756,6 +1765,7 @@ viewBox="0 0 17206.5 4581.43"
     const c = f.constructor.name;
     try {
       if (f.getText) return f.getText() || '';
+      if (f instanceof LIB.PDFCheckBox && f.acroField.getWidgets().length > 1) { const V = f.acroField.dict.lookup(PDFName.of('V')); const n = V && V.asString ? V.asString().replace(/^[/]/, '') : ''; return n && n !== 'Off' ? n : ''; }
       if (f.isChecked) return f.isChecked() ? 'X' : '';
       if (f.getSelected) { const v = f.getSelected(); return Array.isArray(v) ? v.join('|') : (v || ''); }
     } catch (e) { }

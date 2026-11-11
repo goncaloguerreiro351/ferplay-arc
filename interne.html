@@ -108,6 +108,7 @@ footer { color: var(--muted); font-size: 12.5px; margin-top: 22px }
 .lang button[aria-pressed="true"] { background: var(--accent); color: #fff }
 header.top > div:last-child { order: 2; flex: 1 1 320px; min-width: 0 }
 @media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth } }
+.f.need input{outline:3px solid #e8a317;outline-offset:1px;background:#fff8e1}.f.need label{color:#a36a00;font-weight:700}
 .pdfpanel{border:1px solid var(--line);border-radius:10px;padding:12px;margin:10px 0;background:var(--surface)}
 .pdfhead{margin-bottom:8px}.pdfcard{margin:8px 0}.pdflog{margin:6px 0 0 18px;padding:0;font-size:13px}.pdflog .src{color:var(--muted)}
 #pdfBtn{flex:0 0 auto;white-space:nowrap;padding:8px 16px;border:0;border-radius:8px;background:var(--accent);color:#fff;font-weight:700;cursor:pointer;line-height:1.2}
@@ -1319,6 +1320,14 @@ viewBox="0 0 17206.5 4581.43"
         mk.delete(PDFName.of('BC')); mk.delete(PDFName.of('BG'));
         w.dict.delete(PDFName.of('BS')); w.dict.delete(PDFName.of('Border'));
       }
+      // 11/11/2026 (Gonçalo): em alguns leitores (Chrome/Edge…) um botão de rádio ligado NÃO se desliga com um clique (só o Adobe deixa). Para a cruz poder SEMPRE ser retirada à mão, todas as caixas passam a
+      // caixas de seleção (checkbox): sem bits Rádio / NoToggleToOff / RadiosInUnison; cada widget mantém o seu estado «ligado» e /Off, e o AS continua igual ao V
+      if (f instanceof LIB.PDFRadioGroup) {
+        const ff = f.acroField.getFlags();
+        f.acroField.dict.set(PDFName.of('Ff'), LIB.PDFNumber.of(ff & ~(32768 | 16384 | 33554432 | 65536)));
+        f.acroField.dict.delete(PDFName.of('Opt'));
+        const V = f.acroField.dict.lookup(PDFName.of('V')); if (!V) f.acroField.dict.set(PDFName.of('V'), PDFName.of('Off'));
+      }
     }
   }
   // letra do campo (multilinha) que encolhe de 16 pt até 5 pt conforme o número de linhas (inclui as quebradas pela largura)
@@ -1756,6 +1765,7 @@ viewBox="0 0 17206.5 4581.43"
     const c = f.constructor.name;
     try {
       if (f.getText) return f.getText() || '';
+      if (f instanceof LIB.PDFCheckBox && f.acroField.getWidgets().length > 1) { const V = f.acroField.dict.lookup(PDFName.of('V')); const n = V && V.asString ? V.asString().replace(/^[/]/, '') : ''; return n && n !== 'Off' ? n : ''; }
       if (f.isChecked) return f.isChecked() ? 'X' : '';
       if (f.getSelected) { const v = f.getSelected(); return Array.isArray(v) ? v.join('|') : (v || ''); }
     } catch (e) { }
@@ -5627,8 +5637,10 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
     // blocos de produto: começam num cabeçalho de modelo e acabam no «Total HT» (as páginas de resumo e de anexos ficam de fora)
     const heads = [];
     L.forEach((s, i) => { if (/^Mod[èe]le (Industriel|Collectif|Standard|Habitat)\s*:/i.test(s) || /^Habitat\s*>/i.test(s) || /^R[ée]gionale( sur mesure)?\s*>/i.test(s)) heads.push(i); });
-    for (const h of heads) {
-      let e = L.findIndex((s, i) => i > h && (/^Total HT/i.test(s) || /^<</.test(s)));
+    for (let hi = 0; hi < heads.length; hi++) {
+      const h = heads[hi];
+      // 11/11/2026 (Sodismo): documentos sem «Total HT» entre produtos: o bloco acaba no cabeçalho do produto seguinte, na linha de designação do produto seguinte («PPORTILLON PORTILLON ALUMINIUM 1 814,00 814,00») ou nas condições de pagamento
+      let e = L.findIndex((s, i) => i > h && (/^Total HT/i.test(s) || /^<</.test(s) || /^CONDITIONS DE REGLEMENT/.test(s) || /^[A-Z0-9]{4,}\s+[A-Z].*\s\d{1,3}(?:[ .]\d{3})*,\d{2}\s+\d{1,3}(?: \d{3})*,\d{2}$/.test(s) || (hi + 1 < heads.length && i >= heads[hi + 1])));
       if (e < 0) e = L.length;
       const block = L.slice(h, e);
       out.products.push(parseBlock(block));
@@ -5734,6 +5746,7 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
       if (/primaire|antirouille/.test(t)) return pick('PPR');
       return null;
     }
+    if (f.k === 'ouv') { const t = nz(value), c = /motorisable/.test(t) ? 'motorisable' : (/motoris/.test(t) ? 'motorise' : (/manuel/.test(t) ? 'manuel' : '')); if (c && optList(f).some(o => o[0] === c)) return { val: c }; }   // 11/11/2026: «Ouverture motorisable» (sem o «(sans serrure)» do Chiffreur) também casa
     if (f.k === 'm_src') { const t = nz(value); return /client/.test(t) ? { val: 'client' } : (/ferplay/.test(t) ? { val: 'ferplay' } : null); }
     if (f.type === 'number') { const n = num(value); return n ? { val: n } : null; }
     if (f.type === 'select' && (f.k === 'L' || f.k === 'H')) { const n = num(value); const o = optList(f).find(o => String(o[0]) === String(n)); return o ? { val: o[0] } : null; }
@@ -5752,7 +5765,10 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
   }
   function fillProduct(code, prod) {
     const m = CAT[code]; const v = { qt: '1' }; const used = new Set(); const log = []; const extraUsed = new Set();
-    const pairs = prod.pairs.filter(p => !/^(forme|option)/.test(nz(p.key)) || true);
+    // 11/11/2026 (Gonçalo): dois sentidos no mesmo produto («1x Ouverture à droite 1x ouverture à gauche»): sens fica por preencher e o texto vai para as Observations do produto
+    const dualSens = prod.pairs.find(p => /^sens d ouverture/.test(nz(p.key)) && /droit|gauche/.test(nz(p.val)) && (/\bdroit\w*\b.*\bgauche\b|\bgauche\b.*\bdroit\w*\b/.test(nz(p.val)) && /\d\s*x\b/i.test(p.val)));
+    const pairs = prod.pairs.filter(p => p !== dualSens);
+    const habLeft = [];
     const setv = (k, val, src, extra) => { v[k] = val; if (extra) Object.assign(v, extra); log.push({ field: k, value: Array.isArray(val) ? val.join(',') : (val && typeof val === 'object' ? Object.entries(val).map(([a, b]) => a + ' × ' + b).join(', ') : String(val)), src }); };
     // marcadores soltos / linhas de texto: poteaux à sceller / à visser
     const flagsAll = prod.flags.concat(prod.bullets).concat(prod.pairs.map(p => p.key + ' : ' + p.val));
@@ -5801,9 +5817,20 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
         if (f.k === 'vantaux' && prod.kindLine) { const tk = nz(prod.kindLine), vv = /tierc|inegaux/.test(tk) ? 'tierce' : (/mono/.test(tk) ? 'mono' : (/vantaux/.test(tk) ? '2v' : '')); if (vv) { setv('vantaux', vv, prod.kindLine); changed = true; } }
         if (f.type === 'check') { const lt = toks(f.label || ''); const hit = flagsAll.find(s => { const st = toks(s); return st.length >= 2 && cover(lt, st) >= 0.8 && cover(st, lt) >= 0.6; }); if (hit) { setv(f.k, true, hit); changed = true; } }
         if (/^pq\d+X\d+$/.test(f.k)) { for (const h of flagsAll) { const mm = h.match(/(\d+)\s*fois\s*(\d{2,3})\s*x\s*(\d{2,3})/i); if (mm && f.k.toUpperCase() === 'PQ' + mm[2] + 'X' + mm[3]) { setv(f.k, mm[1], h); changed = true; break; } } }
-        if (f.k === 'potMode') { const h = flagsAll.find(s => /poteaux?/.test(nz(s)) && /sceller|visser/.test(nz(s))); if (h) { setv('potMode', /sceller/.test(nz(h)) ? 'sceller' : 'visser', h + ' (quantidade a confirmar)'); changed = true; } }
-        if (f.k === 'potindus' && !v.potindus && flagsAll.some(s => /^sans poteaux/i.test(s))) { setv('potindus', 'Sans poteaux', 'Sans poteaux'); changed = true; }
-        if (f.k === 'potindus') { const h = flagsAll.find(s => /poteaux?\b.*(sceller|visser|platine)|(sceller|visser).*poteaux?/i.test(nz(s)) || /^poteaux? (a|à) (sceller|visser)/i.test(s)); if (h) { setv('potindus', 'Avec poteaux', h); changed = true; } }
+        // 11/11/2026 (Gonçalo): Alu coulissant: «Poteau de fixation à sceller : 2 fois 150X150» + opção «Platine : 2 pour : 150X150» = poteaux 150x150 À VISSER (platine); só «à sceller» (sem linha Platine) = à sceller
+        if (f.k === 'potMode') { const h = flagsAll.find(s => /poteaux?/.test(nz(s)) && /sceller|visser/.test(nz(s))), plat = prod.pairs.find(p => /^platines?$/.test(nz(p.key)) && /\d/.test(p.val)); if (h) { const vis = !!plat || !/sceller/.test(nz(h)); setv('potMode', vis ? 'visser' : 'sceller', plat ? 'Platine : ' + plat.val + ' (platine = poteaux à visser) ← ' + h : h + ' (quantidade a confirmer)'); if (plat) { used.add(plat); extraUsed.add(plat.key + ' : ' + plat.val); } changed = true; } }
+        // 11/11/2026: Alu battant/portillon: «Poteau de fixation à sceller : N fois 150X150» → quantidade dos poteaux dessa secção; «Platine : N pour : 150X150» → caixa Platine dessa secção
+        { let mk = /^p[qx]/.test(f.k) && f.k.match(/^(pq|px)(\d{2,3})[xX]?(\d{2,3})(.*)$/); if (mk && mk[2] !== mk[3]) mk = null; if (mk) mk[3] = mk[2];
+          if (mk && m.hab && m.mat === 'alu') {
+            const sec = mk[3];
+            if (mk[1] === 'pq') { const p = prod.pairs.find(x => /^poteaux? de fixation a sceller$/.test(nz(x.key)) && new RegExp('^\\s*(\\d+)\\s*fois\\s*' + sec + '\\s*x\\s*' + sec, 'i').test(x.val)); if (p) { const n = p.val.match(/^\s*(\d+)/)[1]; if (v[f.k] === undefined) { setv(f.k, n, p.key + ' : ' + p.val); changed = true; } if (String(v[f.k]) === n) used.add(p); } }
+            else { const nm = mk[4], p = nm && prod.pairs.find(x => nz(x.key) === nz(nm) && new RegExp('^\\s*\\d+\\s*pour\\s*:?\\s*' + sec + '\\s*x\\s*' + sec, 'i').test(x.val)); if (p) { if (v[f.k] === undefined) { setv(f.k, true, p.key + ' : ' + p.val); changed = true; } if (v[f.k]) used.add(p); } }
+          } }
+        if (f.k === 'potindus' && !v.potindus && flagsAll.some(s => /^sans poteaux|aucun poteau/i.test(s))) { setv('potindus', 'Sans poteaux', flagsAll.find(s => /^sans poteaux|aucun poteau/i.test(s))); changed = true; }   // 11/11/2026: também «Nombre de poteaux : Aucun poteau»
+        // 11/11/2026 (Gonçalo): fechadura lida do texto («Type de serrure : Serrure Locinox LAKQU2», «Battement de serrure…») e remplissage («Barreaux tube galva 25x25x1,5» = barreaudé 25x25)
+        if ((f.k === 'serYN' || f.k === 'serPort') && !v[f.k] && !/motoris/.test(String(v.ouv || ''))) { const h = flagsAll.find(s => /^(type de serrure|battement de serrure|serrure\b)/.test(nz(s)) && !/sans serrure|aucune/.test(nz(s))); if (h) { setv(f.k, f.k === 'serYN' ? 'Oui' : 'avec', h); changed = true; } }
+        if (f.k === 'rempl' && !v.rempl) { const h = flagsAll.find(s => /^barreaux?\b/.test(nz(s)) || /barreaudage/.test(nz(s))), sz = h && h.match(/(\d{2})\s*x\s*(\d{2})(?!\d)/); if (sz) { const o = optList(f).find(o => /barreaud/.test(nz(o[1])) && nz(o[1]).includes(sz[1] + ' ' + sz[2]) || (/barreaud/.test(nz(o[1])) && nz(o[1]).includes(sz[1] + 'x' + sz[2]))); if (o) { setv('rempl', o[0], h); changed = true; } } }
+        if (f.k === 'potindus' && !v.potindus) { const h = flagsAll.find(s => /poteaux?\b.*(sceller|visser|platine)|(sceller|visser).*poteaux?/i.test(nz(s)) || /^poteaux? (a|à) (sceller|visser)/i.test(s)); if (h) { setv('potindus', 'Avec poteaux', h); changed = true; } }
         // 05/11/2026: poteaux de guidage / réception, rail e fixação lidos do «Descriptif» (ex.: «Deux portiques de guidage sur platines… et un poteau de réception en tube 120x120»)
         if (f.k === 'guidage' && !v.guidage) { const h = flagsAll.find(s => /portiques? de guidage/i.test(nz(s)) || /poteaux? de guidage/i.test(nz(s))); if (h) { const val = /portique/i.test(nz(h)) ? 'Portique' : 'Simple'; if (optList(f).some(o => o[0] === val)) { setv('guidage', val, h); changed = true; } } }
         if (f.k === 'reception' && !v.reception) { const h = flagsAll.find(s => /(poteaux?|portiques?) de r[ée]ception/i.test(s) || /(poteaux?|portiques?) de reception/i.test(nz(s))); if (h) { const val = /portique de r[ée]ception/i.test(nz(h).replace('reception', 'réception')) ? 'Portique' : 'Simple'; if (optList(f).some(o => o[0] === val)) { setv('reception', val, h); changed = true; } } }
@@ -5813,6 +5840,34 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
         if (f.k === 'potSec' && !v.potSec) { const h = flagsAll.concat(prod.bullets).find(s => /poteau/i.test(s) && /(\d{2,3})\s*x\s*\1\b/i.test(s)); if (h) { const mm = h.match(/(\d{2,3})\s*x\s*\1\b/i); if (optList(f).some(o => String(o[0]).startsWith(mm[1]))) { const o = optList(f).find(o => String(o[0]).startsWith(mm[1])); setv('potSec', o[0], h); changed = true; } } }
       }
       if (!changed) break;
+    }
+    // 11/11/2026 (Gonçalo): «Galvanisé» + «Galvanisation à chaud» (+ «Finitions : thermolaquage…» / cor) = Traitement «Galvanisé à chaud» com thermolaquage (GALVA + galvaLaq 'avec' + cor); sem laquage = 'sans'
+    { const F3 = fieldsFor(m, v), ft = F3.find(f => f.k === 'trait');
+      if (ft && !v.trait && optList(ft).some(o => o[0] === 'GALVA')) {
+        const fps = pairs.filter(p => /^finition/.test(nz(p.key))), fl = prod.flags.concat(prod.bullets, prod.options);
+        const blob = nz(fps.map(p => p.key + ' ' + p.val).join(' ') + ' ' + fl.join(' '));
+        if (/galva\w* a chaud|a chaud galva|galvanisation a chaud/.test(blob) && !/sendzimir/.test(nz(fps.map(p => p.val).join(' ')))) {
+          const src = (fl.find(s => /galvanisation .*chaud|galva.*chaud/i.test(s)) || (fps.find(p => /galva/i.test(p.val)) || {}).val || 'Galvanisation à chaud');
+          setv('trait', 'GALVA', src);
+          const lq = /thermolaq|poudrage|laquage|plastification/.test(blob) || !!v.coul;
+          const F4 = fieldsFor(m, v); if (F4.some(f => f.k === 'galvaLaq')) setv('galvaLaq', lq ? 'avec' : 'sans', lq ? 'Galvanisation à chaud + thermolaquage' : 'Galvanisation à chaud (sans laquage)');
+          fps.forEach(p => used.add(p)); fl.filter(s => /galvanisation|^forfait laquage/i.test(s)).forEach(s => extraUsed.add(s));
+        } } }
+    // 11/11/2026 (Gonçalo): fechadura e tipo de abertura deduzidos do texto («ATTENTION : Sans serrure», «traverse intermédiaire pour automatisme», «prêt à motoriser»…).
+    // Sem serrure + «pour automatisme» = motorisável; só «sans serrure» (portail sem modo indicado) = motorisável (o mais provável); ambíguo = nota no registo
+    { const F5 = fieldsFor(m, v), fo = F5.find(f => f.k === 'ouv'), tl = prod.flags.concat(prod.bullets, prod.pairs.filter(p => !/^(type d ouverture|motorisation|choix de la motorisation)/.test(nz(p.key))).map(p => p.key + ' : ' + p.val));
+      const find = re => tl.find(s => re.test(nz(s))), sansS = find(/sans serrure|sans serrure/), pourAuto = find(/pour (l )?automatisme|pour (la )?motorisation|pret a (etre )?motoris|\bmotorisable\b/), avecS = !sansS && find(/^(avec )?serrure\b|\bavec serrure\b/);
+      if (fo && !v.ouv && m.kind !== 'portillon') {
+        const has = c => optList(fo).some(o => o[0] === c);
+        if (pourAuto && has('motorisable')) setv('ouv', 'motorisable', pourAuto);
+        else if (sansS && has('motorisable') && !has('manuel') && !m.hab) setv('ouv', 'motorisable', sansS + ' (défaut : sans serrure = motorisable)');
+        else if (avecS && has('manuel')) setv('ouv', 'manuel', avecS + ' (défaut : avec serrure = manuel)');
+        else if (!has('manuel') && has('motorisable') && !find(/motorise\b/)) { if (!m.hab) setv('ouv', 'motorisable', 'défaut : modèle sans serrure, mode non indiqué = motorisable'); else { const ph = find(/motoris/); if (ph) habLeft.push(ph + ' (type d’ouverture non indiqué : à préciser)'); } }
+      }
+      const F6 = fieldsFor(m, v);
+      if (sansS && F6.some(f => f.k === 'serPort') && !v.serPort) setv('serPort', 'sans', sansS);
+      if (sansS && F6.some(f => f.k === 'serYN') && !v.serYN) setv('serYN', 'Non', sansS);
+      if (sansS) extraUsed.add(sansS); if (pourAuto && v.ouv === 'motorisable') extraUsed.add(pourAuto);
     }
     // 07/11/2026: o A49 battant passou a poder ser motorisable / motorisé, mas o Chiffreur só o dá manual: sem «Type d'ouverture» no devis = manual (como antes)
     if (!v.ouv && /^INSMVAA4/.test(m.code) && m.ouv && m.ouv.length > 1) setv('ouv', 'manuel', 'défaut : A49 manuel');
@@ -5849,6 +5904,8 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
     for (const p of pairs) { const nk = nz(p.key); if (used.has(p) || IGNORE_KEYS.test(nk) || !p.val) continue; if (nk === 'finition' && INFO_FIN.test(p.val)) continue; if (/^forme/.test(nk) && v.forme) continue; left.push(p.key + ' : ' + p.val); }
     for (const l of optLeft) if (!usedSrc.has(l)) left.push('Option : ' + l);
     for (const f of prod.flags) if (f && f.length > 3 && /^[A-ZÀ-Ý0-9]/.test(f) && !usedSrc.has(f) && !/^(Portail|Portillon|Kit|KIT|Total|P\.U|Renfort|Descriptif)/i.test(f)) left.push(f);
+    if (dualSens) log.push({ field: 'sens', value: '(vazio : dois sentidos no devis, a preencher à mão)', src: dualSens.key + ' : ' + dualSens.val });   // 11/11/2026 (Gonçalo): campo em branco, só nota no log
+    habLeft.forEach(x => left.push(x));
     return { v, log, left, optMatches };
   }
 
@@ -5921,6 +5978,14 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
     box.querySelectorAll('[data-popen]').forEach(b => b.onclick = () => openPartial(res, res.products[+b.dataset.popen]));
     document.getElementById('pdfApply').onclick = () => apply(res);
   }
+  function focusRefs() {
+    document.querySelectorAll('#secClient .need').forEach(e => e.classList.remove('need'));
+    window.scrollTo({ top: 0 });
+    const miss = [];
+    for (const id of ['c_ncde', 'c_norc']) { const el = document.getElementById(id), box = el && el.closest('.f'); if (el && box && !box.hidden && !el.value.trim()) { box.classList.add('need'); miss.push(el); } }
+    if (miss.length) { try { miss[0].focus({ preventScroll: true }); } catch (e) { } const cl = () => { document.querySelectorAll('#secClient .need').forEach(e => e.classList.remove('need')); }; miss.forEach(el => el.addEventListener('input', () => el.closest('.f').classList.remove('need'), { once: true })); setTimeout(cl, 60000); }
+    const sc = document.getElementById('secClient'); if (sc && sc.getBoundingClientRect().top > window.innerHeight * 0.6) sc.scrollIntoView({ block: 'start' });
+  }
   function apply(res, clientOnly) {
     const d = res.devis;
     const sel = clientOnly ? [] : [...document.querySelectorAll('#pdfPanel [data-pi]')].filter(c => c.checked).map(c => res.products[+c.dataset.pi]);
@@ -5944,7 +6009,8 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
     editing = null; generated = {}; renderAll(); save();
     document.getElementById('pdfPanel').hidden = true;
     const first = S.products.length - sel.length;
-    document.getElementById('secProducts').scrollIntoView({ block: 'start' });
+    // 11/11/2026 (Gonçalo): o ecrã fica EM CIMA, nos dados do cliente, e o Nº de encomenda / Nº do devis aparece destacado se estiver vazio (para não se esquecerem de o preencher)
+    try { focusRefs(); } catch (e) { document.getElementById('secClient').scrollIntoView({ block: 'start' }); }
     return first;
   }
   // produto sem modelo reconhecido: abre o editor com o que foi lido (a Sónia só escolhe o modelo)
@@ -6022,6 +6088,7 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
     m = n.match(/(poussant|tirant) (droit|gauche)/); if (m) o.sens = m[1][0].toUpperCase() + m[1].slice(1) + ' ' + m[2];
     if (/2 vantaux|2 vtx|deux vantaux|double battant/.test(n)) o.vantaux = '2v'; else if (/monovantail|1 vantail|mono vantail/.test(n)) o.vantaux = 'mono';
     if (/motorisable/.test(n)) o.ouv = 'motorisable'; else if (/motoris/.test(n)) o.ouv = 'motorise'; else if (/manuel/.test(n)) o.ouv = 'manuel';
+    if (!o.ouv && /pour (l )?automatisme|pour (la )?motorisation|pret a (etre )?motoriser/.test(n)) { o.ouv = 'motorisable'; o.ouvNote = 'Type d’ouverture déduit : « pour automatisme » = motorisable' + (o.serrure === false ? ' (sans serrure)' : ''); }   // 11/11/2026: sem serrure + «pour automatisme» = motorisável
     return o;
   }
 
@@ -6095,7 +6162,7 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
       ap = { head: prod.head, kindLine, model: mm, code: '', mat: spec.mat || 'fer', fiche: spec.hab ? 'habitat' : 'industriel', v, log, left: [], missing: [], raw: prod.raw, partial: { mat: spec.mat || 'fer', fiche: spec.hab ? 'habitat' : 'industriel', kind: spec.kind } };
       ap.left = (spec.left || []).slice();
     }
-    ap.notes = (spec.notes || []).concat(notes || []);
+    ap.notes = (spec.notes || []).concat(spec.ouvNote ? [spec.ouvNote] : [], notes || []);
     if (spec.left && mm.code) ap.left = ap.left.concat(spec.left);
     ap.head = spec.title || ap.head;
     return ap;
@@ -6291,8 +6358,8 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
       if (ia >= 0) {   // morada de entrega explícita (pode continuar na página seguinte)
         o.address = [T[ia + 1]]; const ci = T.findIndex((s, j) => j > ia && /^\d{5}\s+[A-Z][A-Z' -]+$/.test(s)); if (ci >= 0) o.address.push(T[ci]);
         const ct = T.find(s => /^CONTACT\s/.test(s)); if (ct) o.tel = ct.replace(/^CONTACT\s*/, '').trim();
-      } else if (/DEPOT DE/i.test(c.all)) { o.address = T.slice(ag + 1, ag + 3); }
-      const rf = T.find(s => /^REF\//.test(s)); if (rf) o.ref = rf.replace(/^REF\/\s*/, '').trim();
+      } else if (/\bDEPOT\b/i.test(c.all)) { o.address = T.slice(ag + 1, ag + 3); }   // 11/11/2026: «A LIVRER A NOTRE DEPOT DE …» / «LIVRAISON FRANCO A NOTRE DEPOT»
+      const rf = T.find(s => /^REF[\/ ]/.test(s)); if (rf) o.ref = rf.replace(/^REF[\/ ]\s*/, '').trim();   // 11/11/2026: também «REF LORGUILLOUS»
       const nm = T.find(s => /^FFERPL?0?\s/.test(s)); if (nm) { const mm = nm.match(/(AC\d+)/); if (mm) o.ncde = mm[1]; }
       let specs = copiedBlocks(T, c.I, { end: /^(ZPORT|ADRESSE|POIDS|TOTAL|Accessoires)/ });
       if (!specs.length) {
@@ -6306,6 +6373,63 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
         sp.notes = ['Ordem de compra: ' + (blk[1] || '').slice(0, 0)].filter(x => x.length > 18);
         specs = [sp];
       }
+      return { client: o, specs };
+    },
+  });
+
+  // SODISMO (Société de Distribution de Motorisation): «Commande N° BF003362 FERPLAY», produtos Habitat copiados do Chiffreur (sem «Total HT» entre produtos)
+  PROFILES.push({
+    id: 'sodismo', name: 'Sodismo',
+    match: c => /sodismo|SOCIETE DE DISTRIBUTION DE MOTORISATION/i.test(c.all) && /^Commande N/m.test(c.all),
+    parse(c) {
+      const T = c.T, o = { societe: 'SODISMO', address: [], contact: '', tel: '', email: '', ref: '', ncde: '' };
+      const mc = T.map(s => s.match(/^Commande N[°º]?\s*(\S+)/i)).find(Boolean); if (mc) o.ncde = mc[1];
+      const ph = T.map(s => s.match(/(\d{2}(?: \d{2}){4})/)).find(Boolean); if (ph) o.tel = ph[1];
+      const em = T.map(s => s.match(/Service commande\s*:\s*(\S+@\S+)/i)).find(Boolean); o.email = em ? em[1] : firstEmail(T, /ferplay/i);
+      const rf = T.map(s => s.match(/^V\/R[ée]f[ée]rence\s+(.+)$/i)).find(Boolean); if (rf) o.ref = rf[1].trim();
+      const heads = T.map((s, i) => /^(Habitat\s*>|Mod[èe]le (Industriel|Collectif|Standard)\s*:|R[ée]gionale)/i.test(s) ? i : -1).filter(i => i >= 0);
+      const products = [];
+      heads.forEach((h, k) => {
+        let e = T.findIndex((s, i) => i > h && (/^CONDITIONS DE REGLEMENT/.test(s) || /^[A-Z0-9]{4,}\s+[A-Z].*\s\d{1,3}(?:[ .]\d{3})*,\d{2}\s+\d{1,3}(?: \d{3})*,\d{2}$/.test(s) || (k + 1 < heads.length && i >= heads[k + 1])));
+        if (e < 0) e = T.length;
+        const pr = c.I.finishProd(c.I.parseBlock(T.slice(h, e)));
+        const dl = T[h - 1] || '', mq = dl.match(/\s(\d{1,3})\s+\d{1,3}(?: \d{3})*,\d{2}\s+\d{1,3}(?: \d{3})*,\d{2}$/);
+        if (mq && Number(mq[1]) > 0 && pr.v) pr.v.qt = String(Number(mq[1]));
+        products.push(pr);
+      });
+      const d = { isChiffreur: true, fromProfile: true, profileName: this.name, profile: 'sodismo', devis: '', client: o.societe, societe: o.societe, contact: '', address: [], tel: o.tel, email: o.email, chantier: [o.ncde, o.ref].filter(Boolean).join(' '), ncde: '', refInt: '', clientCde: o.ncde, transport: '', ignored: [], products: [] };
+      return { full: { devis: d, products, lines: c.L } };
+    },
+  });
+
+  // LES ACIERS DU LITTORAL (Calais): «Commande N° CDEF21242», «D/PCF00446-02 PORTAIL MODELE S37 2 VANTAUX …» seguido das linhas do Chiffreur; «Suivant devis 26-46427»
+  PROFILES.push({
+    id: 'aciers', name: 'Les Aciers du Littoral',
+    match: c => /lesaciersdulittoral|ACIERS DU LITTORAL/i.test(c.all) && /^Commande N/m.test(c.all),
+    parse(c) {
+      const T = c.T.map(x => x.replace(/[\uFFFD\u0000-\u001f]+/g, '').trim()), o = { societe: 'LES ACIERS DU LITTORAL', address: [], contact: '', tel: '', email: '', ref: '', ncde: '', devis: '' };
+      const mc = T.map(s => s.match(/^Commande N[°º]?\s*(\S+)/i)).find(Boolean); if (mc) o.ncde = mc[1];
+      const ph = T.map(s => s.match(/^T[ée]l\s*:\s*([\d .]+)/i)).find(Boolean); if (ph) o.tel = ph[1].trim();
+      const em = T.map(s => s.match(/Email\s*:\s*(\S+@\S+)/i)).find(Boolean); if (em) o.email = em[1].replace(/,(fr|com)$/i, '.$1');
+      const sv = T.map(s => s.match(/^Suivi par\s*:\s*(.+)$/i)).find(Boolean); if (sv) o.contact = sv[1].replace(/_/g, ' ').trim();
+      const sd = T.map(s => s.match(/^Suivant devis\s+(\d{2}-\d+)/i)).find(Boolean); if (sd) o.devis = sd[1];
+      const ad = T.findIndex(s => /^\d+\s+Rue\b/i.test(s)); if (ad >= 0) o.address = [T[ad]];
+      const isD = s => /^[A-Z]\/[A-Z]{2,}\d+-\d+\s+\S/.test(s);   // linha de designação: «D/PCF00446-02 PORTAIL MODELE S37 …»
+      const ih = T.findIndex(s => /^REFERENCE DESIGNATION/.test(s));
+      const ds = []; T.forEach((s, i) => { if (i > ih && isD(s)) ds.push(i); });
+      const specs = [];
+      ds.forEach((d, k) => {
+        const end = k + 1 < ds.length ? ds[k + 1] : T.findIndex((s, i) => i > d && /^(Suivant devis|Important|CONDITIONS)/.test(s));
+        const body = T.slice(d + 1, end < 0 ? T.length : end), des = T[d].replace(/^\S+\s+/, '').replace(PRICE_TAIL, '').replace(/\s+\d+\s+UNITE?$/i, '');
+        const mm = des.match(/MODELE\s+([A-Z]\d{2,3}[A-Z]?)\b/i);
+        if (mm && specs.length === 0) {
+          const kind = kindOf(des), kindLine = ({ battant: 'Portail 2 Vantaux', coulissant: 'Portail Coulissant', autoportant: 'Portail autoportant', portillon: 'Portillon' }[kind] || '');
+          const lines = ['Modèle Industriel : ' + mm[1].toUpperCase(), kindLine, ...body];
+          const prod = c.I.parseBlock(lines);
+          const sp = { prod, ind: mm[1].toUpperCase(), kind, head: 'Modèle Industriel : ' + mm[1].toUpperCase(), title: des, raw: lines.join('\n') };
+          sp.src = {}; specs.push(sp);
+        } else if (specs.length) { specs[0].prod.options.push(des.charAt(0) + des.slice(1).toLowerCase()); }   // linhas seguintes = opções (ex.: «LISSE DEFENSIVE SOUDEE SUR LA TRAVERSE»)
+      });
       return { client: o, specs };
     },
   });
@@ -6562,7 +6686,7 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
     if (r.full) return r.full;
     const cl = r.client || {};
     const products = r.specs.map(sp => buildProduct(sp, I, []));
-    const d = { isChiffreur: true, fromProfile: true, profileName: prof.name, profile: prof.id, devis: '', client: cl.societe || '', societe: cl.societe || '', contact: cl.contact || '', address: (cl.address || []).filter(Boolean), tel: cl.tel || '', email: cl.email || '', chantier: [cl.ncde, cl.ref].filter((x, i, a) => x && a.indexOf(x) === i).join(' '), ncde: '', refInt: cl.quote || '', clientCde: cl.ncde || '', transport: cl.transport || '', ignored: r.ignored || [], products: [] };
+    const d = { isChiffreur: true, fromProfile: true, profileName: prof.name, profile: prof.id, devis: cl.devis || '', client: cl.societe || '', societe: cl.societe || '', contact: cl.contact || '', address: (cl.address || []).filter(Boolean), tel: cl.tel || '', email: cl.email || '', chantier: [cl.ncde, cl.ref].filter((x, i, a) => x && a.indexOf(x) === i).join(' '), ncde: '', refInt: cl.quote || '', clientCde: cl.ncde || '', transport: cl.transport || '', ignored: r.ignored || [], products: [] };
     // 05/11/2026 (Gonçalo): o nº de encomenda do cliente NÃO se usa como nº de encomenda (esse é o interno do PHC, a Ferplay preenche) nem vai para as Observations:
     // vai à frente da referência cliente («CF00001095 OFFICE IMMO»).
     return { devis: d, products, lines };
