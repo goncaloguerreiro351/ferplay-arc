@@ -3644,6 +3644,21 @@ function fieldsHab(m, v) {
   const trr = HABR(r.traitements), trs0 = (trr && trr.liste) || [];
   const trs = m.famille === 'fer-habitat' && trs0.length ? [...trs0, { code: 'BRUT', titre: 'Brut', desc: 'sans traitement ni peinture' }] : trs0;   // 03/11/2026 (feedback interno): o ARC tem a caixa BRUT
   if (trs.length) add({ k: 'trait', sec: 'Traitement', label: 'Traitement', type: 'radio', opts: trs.map(x => [x.code, `${x.titre} – ${x.desc}`]), req: true });
+  // 12/11/2026 (Gonçalo): a Couleur (e a finição associada) vem logo a seguir ao Traitement (só a ordem dos campos mudou)
+  const corBlock = () => {
+  // cor (Acier: depende do tratamento; galvanisé à chaud sem cor; primaire só as cores de primário)
+  const cpt = (HABR(r.traitements) || {}).couleursParTraitement || {};
+  const cols = v.trait && cpt[v.trait] ? cpt[v.trait].map(c => ({ reference: c.ref, nom: c.t })) : habColors(m);
+  const ppr = m.famille === 'fer-habitat' && v.trait === 'PPR';   // 12/11/2026 (Gonçalo): primaire anti-rouille: só Blanc / Gris / Noir / Vert (sem RAL)
+  if (ppr) add({ k: 'coul', sec: 'Finition', label: 'Couleur', type: 'radio', opts: [['BLANC', 'Blanc'], ['GRIS', 'Gris'], ['NOIR', 'Noir'], ['VERT', 'Vert']], req: true });
+  else if (!(v.trait === 'BRUT' || (v.trait && cpt[v.trait] && !cpt[v.trait].length))) add({ k: 'coul', sec: 'Finition', label: 'Couleur', type: 'select', opts: [...cols.map(c => [c.reference, `${c.reference.replace(/^RAL/, 'RAL ')} – ${c.nom}`]), ['__autre', 'Autre RAL (saisie manuelle)']], req: true });
+  if (v.coul === '__autre' && v.trait !== 'BRUT' && !(v.trait && cpt[v.trait])) add({ k: 'ralAutre', sec: 'Finition', label: 'Référence RAL', type: 'text', req: true, hint: t('Attention, voir la disponibilité du RAL hors standard avec l’usine.'), hintRed: true });
+  const fins = v.coul && v.coul !== '__autre' ? habFinitions(m, v.coul) : habFinitions(m, '');
+  if (fins.length) add({ k: 'fin', sec: 'Finition', label: 'Finition', type: 'radio', opts: fins, req: true, deselect: true });
+  else if (v.coul) add({ k: 'finRal', sec: 'Finition', label: 'Finition de la couleur', type: 'radio', opts: ['Texturé', 'Mat'], deselect: true, req: false });   // 05/11/2026
+  habFinExtra(m, v, add);
+  };
+  if (trs.length) corBlock();   // com Traitement (Ferro): a Couleur vem logo a seguir; sem Traitement (Alu) fica onde estava
   const LL = cou ? 'Largeur de passage' : 'Largeur entre piliers (sans jeu) – L';
   if (d.fixeL) add({ k: 'L', sec: 'Dimensions', label: LL, type: 'select', opts: d.L.valores.map(x => [x, fmt(x) + ' mm']), req: true });
   else if (d.L) add({ k: 'L', sec: 'Dimensions', label: LL, type: 'number', unit: 'mm', req: true, min: d.L.min, max: d.L.max, soft: true });
@@ -3752,17 +3767,7 @@ function fieldsHab(m, v) {
       if (o && (o.mode === 'motorisée' || o.mode === 'motorisable')) add({ k: 'chaise', sec: 'Motorisation', label: 'Chaise moteur (rehausse la motorisation pour l’autoportant)', type: 'check' }); else delete v.chaise;
     }
   }
-  // cor (Acier: depende do tratamento; galvanisé à chaud sem cor; primaire só as cores de primário)
-  const cpt = (HABR(r.traitements) || {}).couleursParTraitement || {};
-  const cols = v.trait && cpt[v.trait] ? cpt[v.trait].map(c => ({ reference: c.ref, nom: c.t })) : habColors(m);
-  const ppr = m.famille === 'fer-habitat' && v.trait === 'PPR';   // 12/11/2026 (Gonçalo): primaire anti-rouille: só Blanc / Gris / Noir / Vert (sem RAL)
-  if (ppr) add({ k: 'coul', sec: 'Finition', label: 'Couleur', type: 'radio', opts: [['BLANC', 'Blanc'], ['GRIS', 'Gris'], ['NOIR', 'Noir'], ['VERT', 'Vert']], req: true });
-  else if (!(v.trait === 'BRUT' || (v.trait && cpt[v.trait] && !cpt[v.trait].length))) add({ k: 'coul', sec: 'Finition', label: 'Couleur', type: 'select', opts: [...cols.map(c => [c.reference, `${c.reference.replace(/^RAL/, 'RAL ')} – ${c.nom}`]), ['__autre', 'Autre RAL (saisie manuelle)']], req: true });
-  if (v.coul === '__autre' && v.trait !== 'BRUT' && !(v.trait && cpt[v.trait])) add({ k: 'ralAutre', sec: 'Finition', label: 'Référence RAL', type: 'text', req: true, hint: t('Attention, voir la disponibilité du RAL hors standard avec l’usine.'), hintRed: true });
-  const fins = v.coul && v.coul !== '__autre' ? habFinitions(m, v.coul) : habFinitions(m, '');
-  if (fins.length) add({ k: 'fin', sec: 'Finition', label: 'Finition', type: 'radio', opts: fins, req: true, deselect: true });
-  else if (v.coul) add({ k: 'finRal', sec: 'Finition', label: 'Finition de la couleur', type: 'radio', opts: ['Texturé', 'Mat'], deselect: true, req: false });   // 05/11/2026
-  habFinExtra(m, v, add);
+  if (!trs.length) corBlock();
   // opções (dependem da forma)
   if (!v.forme && (r.formes || []).length) add({ k: 'optInfo', sec: 'Options', type: 'info', text: t('Choisissez d’abord la forme : les options dépendent de la forme.') });
   const fixes = (m.rec.optionfixe || []).map(String);
