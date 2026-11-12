@@ -1037,7 +1037,7 @@ viewBox="0 0 17206.5 4581.43"
     if (P.gache) { if (!box(/mission/i.test(P.gache) ? /^A EMISSION$/ : /^A RUPTURE$/)) obs.push(tr('Gâche électrique') + ' : ' + P.gache); }
     // pose e fixação
     if (P.fixTitre) {
-      if (/pivot/i.test(P.fixTitre)) { if (!box(P.pivFix === 'sceller' ? /^A SCELLER$/ : /^A VISSER$/, { row: /PIVOTS/ })) obs.push(tr('Fixation') + ' : ' + P.fixTitre + (P.pivFix ? ' (' + (P.pivFix === 'sceller' ? tr('À sceller') : tr('À visser')) + ')' : '')); }   // 07/11/2026 (Gonçalo): pivot standard / renforcé / roulement: cruz na caixa PIVOTS (à visser ou à sceller), não nos gonds   // 03/11/2026: a caixa PIVOTS é só de roulement à billes (ver opção própria)
+      if (/pivot/i.test(P.fixTitre)) { if (!P.pivFix || !box(P.pivFix === 'sceller' ? /^A SCELLER$/ : /^A VISSER$/, { row: /PIVOTS/ })) obs.push(tr('Fixation') + ' : ' + P.fixTitre + (P.pivFix ? ' (' + (P.pivFix === 'sceller' ? tr('À sceller') : tr('À visser')) + ')' : '')); }   // 07/11/2026 (Gonçalo): pivot standard / renforcé / roulement: cruz na caixa PIVOTS (à visser ou à sceller), não nos gonds   // 03/11/2026: a caixa PIVOTS é só de roulement à billes (ver opção própria)
       else if (/pente/i.test(P.fixTitre)) { box(/^RELEVEUR DE PENTE/); const f = M.texts.find(x => /RELEVEUR DE PENTE$/.test(NZ(x.row))); if (f && P.deniv) txt(f.name, String(P.deniv).replace('.', ',')); }
       else if (/gond/i.test(P.fixTitre)) { box(/sceller/i.test(P.fixTitre) ? /^A SCELLER$/ : /^A VISSER$/, { row: /GONDS( A VISSER)?$/ }); if (!/multir.glage|sceller/i.test(P.fixTitre)) obs.push(tr('Fixation') + ' : ' + P.fixTitre); }
       else obs.push(tr('Fixation') + ' : ' + P.fixTitre);
@@ -3723,7 +3723,7 @@ function fieldsHab(m, v) {
       else delete v.fix2;
       const fx = habFix(m, v);
       // 07/11/2026 (Gonçalo): com um pivot escolhido na fixação (pivot standard acier, renforcé, roulement à billes) pergunta-se se é à visser ou à sceller: a cruz vai para a caixa PIVOTS do ARC (e não para os GONDS)
-      if (fx && /pivot/i.test(fx.titre || '')) add({ k: 'pivFixPose', sec: 'Pose', label: 'Pivots : fixation', type: 'radio', opts: [['visser', 'À visser'], ['sceller', 'À sceller']], req: true });
+      if (fx && /pivot/i.test(fx.titre || '')) add({ k: 'pivFixPose', sec: 'Pose', label: 'Pivots : fixation', type: 'radio', opts: [['visser', 'À visser'], ['sceller', 'À sceller']], req: false });
       else delete v.pivFixPose;
       if (fx && fx.saisie && fx.saisie.campo) {
         // 22/10/2026 (Ferplay, via Gonçalo): dénivelé em abertura manual 9 a 12 %, em motorizada 2 a 16 % (o Chiffreur tem os limites trocados)
