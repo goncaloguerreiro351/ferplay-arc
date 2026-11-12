@@ -1827,6 +1827,9 @@ viewBox="0 0 17206.5 4581.43"
 <script>// Traduções da página (o francês é o texto original e a chave). O PDF e o email para a Ferplay ficam sempre em francês.
 // [pt, en]
 const I18N_SRC = {
+  'Sans remplissage': ['Sem enchimento', 'Without infill'],
+  'Lu par OCR : confirmez chaque valeur (surtout les mesures)': ['Lido por OCR: confirme cada valor (sobretudo as medidas)', 'Read by OCR: confirm every value (especially measures)'],
+  'Document digitalisé lu par OCR : le texte peut contenir des erreurs. Confirmez chaque valeur (surtout les mesures) avant de générer l’ARC.': ['Documento digitalizado lido por OCR: o texto pode ter erros. Confirme cada valor (sobretudo as medidas) antes de gerar o ARC.', 'Scanned document read by OCR: the text may contain errors. Confirm every value (especially measures) before generating the ARC.'],
   'Aucun produit n’a pu être lu automatiquement dans ce PDF (format non reconnu). Ce qui a été lu (client, références) est ci-dessus : vérifiez-le, puis ajoutez les produits à la main.': ['Não foi possível ler nenhum produto automaticamente neste PDF (formato não reconhecido). O que foi lido (cliente, referências) está acima: confirme-o e depois acrescente os produtos à mão.', 'No product could be read automatically from this PDF (format not recognised). What was read (client, references) is shown above: check it, then add the products by hand.'],
   'Quantité (clôtures identiques, facultatif : sinon indiquez les largeurs en mètre linéaire)': ['Quantidade (vedações iguais, facultativo: senão indique as larguras em metro linear)', 'Quantity (identical fences, optional: otherwise give the widths in linear metres)'],
   'Quantité (clôtures identiques, facultatif : sinon indiquez les largeurs en mètre linéaire)': ['Quantidade (vedações iguais, facultativo: senão indique as larguras em metro linear)', 'Quantity (identical fences, optional: otherwise give the widths in linear metres)'],
@@ -3268,7 +3271,7 @@ function fieldsForAll(m, v) {
   }
   if (m.kind === 'cloture' && m.gamme !== 'st') { if (v0.lado === undefined) v0.lado = 'A'; add({ k: 'lado', sec: 'Observations', label: 'Côté de la grille (vue de l’extérieur)', type: 'radio', opts: [['D', 'Droite'], ['G', 'Gauche'], ['A', 'Les deux côtés']], req: false, nodeselect: true }); }
   if (m.kind === 'cloture' && m.gamme !== 'st') add({ k: 'sepArc', sec: 'Observations', label: 'Fiche séparée (ne pas inclure cette clôture dans la fiche du portail)', type: 'check' });
-  if (m.remplissage) add({ k: 'rempl', sec: 'Remplissage', label: 'Remplissage', type: 'radio', opts: m.remplissage, req: true });
+  if (m.remplissage) add({ k: 'rempl', sec: 'Remplissage', label: 'Remplissage', type: 'radio', opts: [...m.remplissage, ['__sans', 'Sans remplissage']], req: true });   // 12/11/2026 (Gonçalo): escolha explícita «sem remplissage» (conta como escolha válida; sem cruz no PDF)
   if (m.faceLos) add({ k: 'faceLos', sec: 'Remplissage', label: 'Barreaux carrés 25x25', type: 'radio', opts: [['face', 'Positionnés de face'], ['losange', 'En losange']], req: true });   // Herculeos Nº2B (tarif p.79)
   // --- motorização
   if (portail && (ouv === 'motorisable' || ouv === 'motorise') && m.crem) {
@@ -4244,7 +4247,7 @@ function ldgPdfValues(m, v) {
 const ALUI_RAL = ['RAL9010', 'RAL9005', 'RAL5003', 'RAL6005', 'RAL3004', 'RAL7016'];
 const ALUI_RAL_CL = ['RAL6005', 'RAL7016'];
 // remplissages: código → [nome no ARC, rótulo]
-const ALUI_RN = { BARR: ['', 'Barreaudé 30x30'], CITR: ['CITRINE', 'Citrine (barreaudé 100x20)'], PERI: ['PERIDOT', 'Péridot (plein, lames)'], TOPA: ['TOPAZE', 'Topaze (plein, lames)'], TOUR: ['TOURMALINE', 'Tourmaline (1/3 plein, 2/3 barreaudé)'],
+const ALUI_RN = { SANS: ['', 'Sans remplissage'], BARR: ['', 'Barreaudé 30x30'], CITR: ['CITRINE', 'Citrine (barreaudé 100x20)'], PERI: ['PERIDOT', 'Péridot (plein, lames)'], TOPA: ['TOPAZE', 'Topaze (plein, lames)'], TOUR: ['TOURMALINE', 'Tourmaline (1/3 plein, 2/3 barreaudé)'],
   TANZ: ['TANZANITE', 'Tanzanite (3/4 plein, 1/4 barreaudé)'], TANL: ['TANZANITE DECOUPE LASER', 'Tanzanite avec découpe laser (croix de Saint André)'], OPAL: ['OPALE', 'Opale (tôle, 1 traverse centrale)'],
   IRIS: ['IRIS', 'Iris (tôle, traverses intermédiaires)'], CANN: ['CANNISSE', 'Cannisse (barreaux Ø25 plaqués)'] };
 const ALUI_RB = ['BARR', 'PERI', 'TOPA', 'TOUR', 'TANZ', 'TANL', 'OPAL', 'IRIS', 'CANN'];       // battant e portillon ALU49c (tarif p.215–222)
@@ -4337,10 +4340,11 @@ if (typeof ALUIND_ON !== 'undefined' && ALUIND_ON) {
   for (const [c, label] of ALUI_CL)
     CAT['ALUI:' + c] = { code: 'ALUI:' + c, rcode: label, alu: true, mat: 'alu', fiche: 'industriel', label, gamme: 'ai', kind: 'cloture', fam: 'cl', rempls: null, sens: [], ouv: ['manuel'], couleurs: ALUI_RAL_CL, options: [], famille: 'alu-industriel' };
 }
-const aluiPleins = v => !!v.rempl && v.rempl !== 'BARR';
+const aluiR = v => v.rempl === 'SANS' ? 'BARR' : v.rempl;   // «sans remplissage» conta como o caso base (sem peças cheias) nos limites do tarif
+const aluiPleins = v => !!v.rempl && v.rempl !== 'BARR' && v.rempl !== 'SANS';
 // limites do tarif por modelo e remplissage (soft: avisos «à étudier par Ferplay», nunca bloqueiam)
 function aluLim(m, v) {
-  const r = v.rempl || '', op = r === 'OPAL' || r === 'IRIS';
+  const r = aluiR(v) || '', op = r === 'OPAL' || r === 'IRIS';
   if (m.fam === '49') return m.kind === 'portillon' ? { L: [1000, 1500], H: [1000, 2500] } : { L: [2000, 10000], H: [1000, 2500] };
   if (m.fam === '49c') {
     if (m.kind === 'portillon') return { L: [1000, 1500], H: [1000, op ? 2250 : 2500] };
@@ -4353,7 +4357,7 @@ function aluLim(m, v) {
 }
 // combinações L × H que o tarif marca como impossíveis («-» nas grelhas)
 function aluImpossible(m, v) {
-  const L = Number(v.L) || 0, H = Number(v.H) || 0, r = v.rempl || 'BARR';
+  const L = Number(v.L) || 0, H = Number(v.H) || 0, r = aluiR(v) || 'BARR';
   if (!L || !H) return false;
   if (m.fam === '49' && m.kind !== 'portillon') return H <= 1000 && L > 6000;
   if (m.fam === '45' && m.kind === 'coulissant') return r !== 'BARR' && H >= 2500 && L > 6000;
@@ -4406,7 +4410,7 @@ function fieldsAluInd(m, v) {
   const L = Number(v.L) || 0, H = Number(v.H) || 0, pl = aluiPleins(v);
   // --- remplissage (primeiro: dele dependem as medidas)
   if (m.rempls) {
-    add({ k: 'rempl', sec: 'Remplissage', label: 'Remplissage', type: 'select', opts: m.rempls.map(c => [c, ALUI_RN[c][1]]), req: true, wide: true });
+    add({ k: 'rempl', sec: 'Remplissage', label: 'Remplissage', type: 'select', opts: [...m.rempls.map(c => [c, ALUI_RN[c][1]]), ['SANS', ALUI_RN.SANS[1]]], req: true, wide: true });   // 12/11/2026 (Gonçalo): «Sans remplissage» explícito
     if (['PERI', 'TOPA', 'TOUR', 'TANZ', 'TANL'].includes(v.rempl)) {
       add({ k: 'lamesOr', sec: 'Remplissage', label: 'Orientation des lames', type: 'radio', opts: ['Horizontales', 'Verticales'], req: true });
       add({ k: 'lamesL', sec: 'Remplissage', label: 'Largeur des lames', type: 'radio', opts: ['100x20', '200x20'], req: true });
@@ -4567,7 +4571,7 @@ function aluProductPdf(p, m, v0, F, warnings) {
   if (v.m_palp) P.horsArc.push(t('Pré-équipement : prémontage du palpeur embarqué, passage du câble d’alimentation et douchette passe-fils'));
   if (m.kind === 'battant') P.vantaux = v.vantaux;
   // serrure: manual battant/portillon pergunta; coulissant/autoportant levam sempre (Locinox se barreaudé 30x30, Portac à crochet nos restantes); motorisable battant: sem serrure
-  if (m.fam === '45') { P.serrure = true; P.serLoc = (v.rempl || 'BARR') === 'BARR' || !!v.o_lsk; }
+  if (m.fam === '45') { P.serrure = true; P.serLoc = (aluiR(v) || 'BARR') === 'BARR' || !!v.o_lsk; }
   else P.serrure = v.serrure ? v.serrure === 'oui' : (motor ? false : undefined);
   if (v.finRal) P.horsArc.push(t('Finition de la couleur') + ' : ' + t(v.finRal));
   if (ouv === 'motorise' && v.m_src === 'ferplay' && v.m_app) P.kit = String(v.m_app).split(' – ')[0];
@@ -4600,6 +4604,7 @@ function aluProductPdf(p, m, v0, F, warnings) {
   if (v.platGonds) P.horsArc.push(t('Platines pour gonds orthogonaux (galvanisé peint, battants sans poteaux)'));
   // remplissage (o ARC só tem «MODÈLE»: tudo o resto vai para as Observations)
   if (rn && rn[0]) P.horsArc.push(t('Remplissage') + ' : ' + t(rn[1]));
+  if (v.rempl === 'SANS') P.horsArc.push(t('Remplissage') + ' : ' + t('Sans remplissage'));
   if (v.lamesOr) P.horsArc.push(t('Orientation des lames') + ' : ' + t(v.lamesOr) + ' ; ' + t('Largeur des lames') + ' : ' + v.lamesL);
   if (v.tole) P.horsArc.push(t('Tôle') + ' : ' + t({ pleine: 'Tôle pleine 30/10', R5T8: 'Tôle perforée ronde R5 T8 (sans plus-value)', C10U30: 'Tôle perforée carrée C10 U30 (plus-value de 12 %)' }[v.tole]));
   const ob = (k, lab, map) => { if (v[k]) P.horsArc.push(t(lab) + ' : ' + t(map[v[k]])); };
@@ -5648,6 +5653,33 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
   const cover = (a, b) => { const A = new Set(a), B = new Set(b); if (!A.size) return 0; let i = 0; for (const x of A) if (B.has(x)) i++; return i / A.size; };   // quanto de a está em b
   const num = s => { const m = String(s).replace(/\s/g, '').match(/\d+(?:[.,]\d+)?/); return m ? m[0].replace(',', '.') : ''; };
 
+  /*OCR-BEGIN*/
+  // ------------------------------------------------------------------ 0. OCR (piloto, só dev): páginas sem texto (digitalizadas) → Tesseract.js em francês, no próprio browser
+  // A biblioteca e o dicionário (fra) carregam-se só quando há uma página sem texto, a partir de window.OCR_BASE (por defeito «ocr/», ao lado da página).
+  // Tudo o que vem do OCR fica marcado (line.ocr = true) e o painel avisa «lido por OCR, confirmar».
+  let ocrW = null;
+  const absUrl = u => new URL(u, document.baseURI).href;
+  async function ocrEnsure() {
+    if (ocrW) return ocrW;
+    const B = absUrl(window.OCR_BASE || 'ocr/'), B2 = B.endsWith('/') ? B : B + '/';
+    if (!window.Tesseract) await new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = B2 + 'tesseract.min.js'; sc.onload = res; sc.onerror = () => rej(new Error('OCR indisponível (' + B2 + ')')); document.head.appendChild(sc); });
+    ocrW = await window.Tesseract.createWorker('fra', 1, { workerPath: B2 + 'worker.min.js', corePath: B2 + 'core/tesseract-core-simd.wasm.js', langPath: B2 + 'lang/' });
+    return ocrW;
+  }
+  async function ocrPage(pdf, p, scale) {
+    const w = await ocrEnsure(), pg = await pdf.getPage(p), vp = pg.getViewport({ scale }), cv = document.createElement('canvas');
+    cv.width = vp.width; cv.height = vp.height; const cx = cv.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height);
+    await pg.render({ canvasContext: cx, viewport: vp }).promise;
+    let src = cv; try { const c2 = document.createElement('canvas'); c2.width = cv.width; c2.height = cv.height; const x2 = c2.getContext('2d'); x2.filter = 'grayscale(1) contrast(1.6)'; x2.drawImage(cv, 0, 0); src = c2; } catch (e) { }   // 12/11/2026: cinzentos + contraste
+    const r = await w.recognize(src, {}, { blocks: true }), out = [];
+    for (const b of (r.data.blocks || [])) for (const par of (b.paragraphs || [])) for (const l of (par.lines || [])) {
+      const text = l.text.replace(/\s+/g, ' ').trim(); if (!text) continue;
+      out.push({ page: p, text, ocr: true, conf: Math.round(l.confidence), y: l.bbox.y0, items: l.words.map(x => ({ x: Math.round(x.bbox.x0 / scale), s: x.text, w: Math.round((x.bbox.x1 - x.bbox.x0) / scale) })) });
+    }
+    return out.sort((a, b) => a.y - b.y);
+  }
+
+  /*OCR-END*/
   // ------------------------------------------------------------------ 1. ler o PDF (pdf.js)
   async function readLines(file) {
     const lib = window.pdfjsLib; if (!lib) throw new Error('pdf.js indisponível');
@@ -5667,6 +5699,7 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
       }
       rows.sort((a, b) => b.y - a.y);
       lines.push({ page: p, text: '', marker: true });
+      /*OCR-BEGIN*/ if (!rows.length && window.PDF_OCR !== false) { try { for (const ol of await ocrPage(pdf, p, 3.2)) lines.push(ol); } catch (e) { lines.ocrError = String(e && e.message || e); } }   // página sem texto: OCR (piloto) /*OCR-END*/
       for (const r of rows) {
         r.items.sort((a, b) => a.x - b.x);
         let s = '', end = null;
@@ -5675,7 +5708,9 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
       }
     }
     try { await pdf.destroy(); } catch (e) { }   // 12/11/2026: liberta a memória do PDF (leituras seguidas de muitos PDFs bloqueavam o separador)
-    return lines.filter(l => !l.marker).map(l => ({ page: l.page, text: l.text, items: l.items }));
+    const outL = lines.filter(l => !l.marker).map(l => (l.ocr ? { page: l.page, text: l.text, items: l.items, ocr: true, conf: l.conf } : { page: l.page, text: l.text, items: l.items }));
+    if (lines.ocrError) outL.ocrError = lines.ocrError;
+    return outL;
   }
 
   // ------------------------------------------------------------------ 2. analisar o orçamento do Chiffreur
@@ -5928,6 +5963,8 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
         // 11/11/2026 (Gonçalo): fechadura lida do texto («Type de serrure : Serrure Locinox LAKQU2», «Battement de serrure…») e remplissage («Barreaux tube galva 25x25x1,5» = barreaudé 25x25)
         if ((f.k === 'serYN' || f.k === 'serPort') && !v[f.k] && !/motoris/.test(String(v.ouv || ''))) { const h = flagsAll.find(s => /^(type de serrure|battement de serrure|serrure\b)/.test(nz(s)) && !/sans serrure|aucune/.test(nz(s))); if (h) { setv(f.k, f.k === 'serYN' ? 'Oui' : 'avec', h); changed = true; } }
         // 12/11/2026: «Remplissage en tube 25x25…» = barreaudé; «Remplissage en maille 100x50» = grillagé maille 100x50 (só com a medida igual à de uma opção)
+        // 12/11/2026: «Sans remplissage» só se o devis o diz claramente; senão fica em branco (não se adivinha)
+        if (f.k === 'rempl' && !v.rempl) { const sans = optList(f).find(o => o[0] === '__sans' || o[0] === 'SANS'), h = sans && flagsAll.find(s => /^sans (remplissage|barreaudage)\b/.test(nz(s))); if (h) { setv('rempl', sans[0], h); changed = true; } }
         if (f.k === 'rempl' && !v.rempl) { const h = flagsAll.find(s => /^remplissage\b/.test(nz(s)) && /\d{2,3}\s*x\s*\d{2,3}/.test(s)), sz = h && h.match(/(\d{2,3})\s*x\s*(\d{2,3})(?!\d)/); if (sz) { const grill = /maille|grillag/.test(nz(h)), o = optList(f).find(o => (grill ? /grillag/ : /barreaud/).test(nz(o[1])) && (nz(o[1]).includes(sz[1] + 'x' + sz[2]) || nz(o[1]).includes(sz[1] + ' ' + sz[2]))); if (o) { setv('rempl', o[0], h); changed = true; } } }
         if (f.k === 'rempl' && !v.rempl) { const h = flagsAll.find(s => /^barreaux?\b/.test(nz(s)) || /barreaudage/.test(nz(s))), sz = h && h.match(/(\d{2})\s*x\s*(\d{2})(?!\d)/); if (sz) { const o = optList(f).find(o => /barreaud/.test(nz(o[1])) && nz(o[1]).includes(sz[1] + ' ' + sz[2]) || (/barreaud/.test(nz(o[1])) && nz(o[1]).includes(sz[1] + 'x' + sz[2]))); if (o) { setv('rempl', o[0], h); changed = true; } } }
         if (f.k === 'potindus' && !v.potindus) { const h = flagsAll.find(s => /poteaux?\b.*(sceller|visser|platine)|(sceller|visser).*poteaux?/i.test(nz(s)) || /^poteaux? (a|à) (sceller|visser)/i.test(s)); if (h) { setv('potindus', 'Avec poteaux', h); changed = true; } }
@@ -6047,7 +6084,7 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
     if (!lines.length) return { devis: { scanned: true, isChiffreur: false, products: [] }, products: [], lines };
     const d = parseDevis(lines);
     // encomendas de outros clientes: perfis por cliente (pdf_profiles.js)
-    if (!d.isChiffreur && window.PdfProfiles) { const pr = window.PdfProfiles.analyse(lines, { findModel, fillProduct, parseBlock, finishProd, nz, toks }); if (pr) return pr; }
+    if (!d.isChiffreur && window.PdfProfiles) { const pr = window.PdfProfiles.analyse(lines, { findModel, fillProduct, parseBlock, finishProd, nz, toks }); if (pr) { if (lines.some(l => l.ocr)) { pr.devis.ocr = true; (pr.products || []).forEach(p => { p.notes = (p.notes || []).concat([T('Lu par OCR : confirmez chaque valeur (surtout les mesures)')]); }); } return pr; } }
     // 05/11/2026 (Gonçalo): há PDFs com o cabeçalho de outro logótipo/formato mas o corpo igual ao do Chiffreur: lê-se sempre, nunca se bloqueia
     if (!d.isChiffreur && d.products.length) { d.isChiffreur = true; d.genericChiffreur = true; if (!d.societe && !d.client) { const iv = lines.findIndex(l => /Soci[ée]t[ée]\s*:/i.test(l.text)); if (iv >= 0) d.societe = lines[iv].text.replace(/^.*Soci[ée]t[ée]\s*:\s*/i, '').trim(); } }
     // 12/11/2026 (Gonçalo): nunca bloquear por faltar «DEVIS : …»: se nenhum perfil nem o analisador do Chiffreur reconheceu produtos, lê-se pelo menos o cliente / nº de devis / contactos de forma genérica
@@ -6060,6 +6097,7 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
       Object.assign(d, { societe: d.societe || g.societe || '', email: d.email || g.email || '', tel: d.tel || g.tel || '', chantier: d.chantier || g.ref || '', unrecognised: true });
     }
     const products = d.products.map(prod => finishProd(prod));
+    if (lines.some(l => l.ocr)) { d.ocr = true; products.forEach(p => { p.notes = (p.notes || []).concat([T('Lu par OCR : confirmez chaque valeur (surtout les mesures)')]); }); }
     return { devis: d, products, lines };
   }
   // ------------------------------------------------------------------ 6. interface (só no interne)
@@ -6085,7 +6123,8 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
     // formulário já com outro cliente: as coordonnées só se preenchem se estiverem vazias
     let warn = ''; try { const cur = readClient(); const ns = d.societe || d.client; if (cur.societe && ns && nz(cur.societe) !== nz(ns)) warn = '<div class="alert">' + E(T('Le formulaire contient déjà un autre client')) + ' (' + E(cur.societe) + ') : ' + E(T('ses coordonnées ne sont pas remplacées. Utilisez « Recommencer » pour une nouvelle demande.')) + '</div>'; } catch (e) { }
     const none = !res.products.length ? '<div class="alert">' + E(T('Aucun produit n’a pu être lu automatiquement dans ce PDF (format non reconnu). Ce qui a été lu (client, références) est ci-dessus : vérifiez-le, puis ajoutez les produits à la main.')) + '</div>' : '';
-    box.innerHTML = head + warn + none + cards + `<div class="row"><button type="button" id="pdfApply" class="primary">${E(T('Appliquer au formulaire'))}</button><button type="button" id="pdfClose">${E(T('Fermer'))}</button></div><p class="hint">${E(T('Rien n’est envoyé : le PDF est lu sur cet ordinateur. Les prix n’entrent jamais. Vérifiez toujours chaque produit avant de générer l’ARC.'))}</p>`;
+    const ocrW = d.ocr ? '<div class="alert">' + E(T('Document digitalisé lu par OCR : le texte peut contenir des erreurs. Confirmez chaque valeur (surtout les mesures) avant de générer l’ARC.')) + '</div>' : '';
+    box.innerHTML = head + warn + ocrW + none + cards + `<div class="row"><button type="button" id="pdfApply" class="primary">${E(T('Appliquer au formulaire'))}</button><button type="button" id="pdfClose">${E(T('Fermer'))}</button></div><p class="hint">${E(T('Rien n’est envoyé : le PDF est lu sur cet ordinateur. Les prix n’entrent jamais. Vérifiez toujours chaque produit avant de générer l’ARC.'))}</p>`;
     box.hidden = false;
     document.getElementById('pdfClose').onclick = () => { box.hidden = true; };
     box.querySelectorAll('[data-popen]').forEach(b => b.onclick = () => openPartial(res, res.products[+b.dataset.popen]));
@@ -6709,6 +6748,83 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
         }
         specs.push({ prod: I.parseBlock(lines), ind: lab, kind, qt, head: lines[0], title: des, raw: lines.join('\n') });
       }
+      return { client: o, specs };
+    },
+  });
+
+  // OCR estruturado (piloto, 12/11/2026): encomenda digitalizada com a designação numa linha («COULISSANT AZ5 4000X1500 DP PLATINE RAL7016 1,000 P 1478,88 …») seguida de linhas
+  // «CHAVE : VALOR» do Chiffreur («LARGEUR ENTRE POTEAUX : 4000 MM», «HAUTEUR TOTALE : 1500 MM», «COULEUR : RAL 7016») e de linhas soltas («MOTORISABLE», «POTEAUX SUR PLATINE»…).
+  // O modelo só se aceita se o OCR o escreveu como um modelo do catálogo (A25, A49…); um modelo estranho («AZ5») fica por escolher, com o texto lido na nota. Tudo vai marcado «lido por OCR».
+  PROFILES.push({
+    id: 'ocrstruct', name: 'Encomenda digitalizada (OCR, estruturada)',
+    match: c => c.L.some(l => l.ocr) && (c.L.some(l => /CL[ÔO]TURES?\s+BRISE-?VUE\s*>\s*CH\d/i.test(l.text)) || c.L.some((l, i) => /\b(PORTAIL|PORTILLON|COULISSANT|AUTOPORT\w*|BATTANT|PIVOTANT|CL[ÔO]TURE)\b/i.test(l.text) && /\d{3,5}\s*[xX]\s*\d{3,5}|\b(\S+\s+)?(Portail|Portillon)\b/i.test(l.text) && c.L.slice(i + 1, i + 8).some(n => /^(LARGEUR|HAUTEUR)[^:]*:/i.test(n.text)))),
+    parse(c) {
+      const T = c.T, I = c.I, o = { societe: '', address: [], contact: '', tel: '', email: '', ref: '', ncde: '' };
+      const bvI = T.findIndex(s => /CL[ÔO]TURES?\s+BRISE-?VUE\s*>\s*CH\d/i.test(s)), bvSpecs = [];
+      if (bvI >= 0) {   // devis de clôture brise-vue copiado do Chiffreur: cabeçalho + «Forme / Hauteur Totale / Largeur (entre maçonnerie)» + poteaux; repete-se em várias páginas («SUITE DEVIS»): lê-se só a primeira
+        const hm = T[bvI].match(/CL[ÔO]TURES?\s+BRISE-?VUE\s*>\s*(CH\d\w*)\s*(MODIFI\w*)?/i), bl = [];
+        for (let k = bvI + 1; k < Math.min(T.length, bvI + 16) && !/^(OPTION|SUITE DEVIS|Remises?|Total)/i.test(T[k]); k++) bl.push(T[k]);
+        const head = 'Habitat > Aluminium > Contemporain > CLÔTURES BRISE-VUE > ' + hm[1].toUpperCase() + (hm[2] ? ' ' + hm[2].toUpperCase() : '');
+        const lines = [head, 'Clôture', ...bl.filter(x => !/^Cl[ôo]ture\s*\(/i.test(x) && !/^\d+\s+Poteaux?/i.test(x) ? true : true).map(x => x.replace(/^(\d+)\s+(Poteaux?)/i, '$1 $2'))];
+        bvSpecs.push({ prod: I.parseBlock(lines), notes: ['Lu par OCR : confirmez chaque valeur (surtout les mesures)'].concat(hm[2] ? ['Modèle « ' + hm[1].toUpperCase() + ' ' + hm[2].toUpperCase() + ' » (modifié) : à confirmer'] : []), title: head.split('>').pop().trim() });
+      }
+      const hd = T.map(s => s.match(/^\W*([A-ZÀ-Ý][A-ZÀ-Ý .&-]{2,}?)\s+COMMANDE\s+FOURNISSEUR/)).find(Boolean); if (hd) o.societe = hd[1].trim();
+      const nc = T.map(s => s.match(/N[°o]?\s*CF\s*(\d{4,})/i)).find(Boolean); if (nc) o.ncde = nc[1];
+      const rf = T.map(s => s.match(/^N\/?\s*REF\s*:\s*(.+)$/i)).find(Boolean); if (rf) o.ref = rf[1].trim();
+      const stop = /^(Toute livraison|PAIEMENT|Total|TVA|Remises|HORAIRE|VENDREDI|LUNDI|Port franco)/i, specs = [];
+      T.forEach((s, i) => {
+        if (!(/\b(PORTAIL|PORTILLON|COULISSANT|AUTOPORT\w*|BATTANT|PIVOTANT|CL[ÔO]TURE)\b/i.test(s) && /\d{3,5}\s*[xX]\s*\d{3,5}|\b(\S+\s+)?(Portail|Portillon)\b/i.test(s))) return;
+        const blk = []; for (let k = i + 1; k < Math.min(T.length, i + 14) && !stop.test(T[k]); k++) blk.push(T[k]);
+        if (!blk.slice(0, 7).some(x => /^(LARGEUR|HAUTEUR)[^:]*:/i.test(x))) return;
+        const des = s, nd = nz(des), kind = /portillon/.test(nd) ? 'portillon' : (/autoport/.test(nd) ? 'autoportant' : (/coulissant/.test(nd) ? 'coulissant' : (/cloture/.test(nd) ? 'cloture' : 'battant')));
+        const kindLine = { battant: 'Portail 2 Vantaux', coulissant: 'Portail Coulissant', autoportant: 'Portail autoportant', portillon: 'Portillon', cloture: 'Clôture' }[kind];
+        const mt = des.toUpperCase().match(MODEL_IND), lab = mt ? mt[1] : '', odd = (des.toUpperCase().match(/\bA[A-Z]\d{1,2}\b|\bA\d[A-Z]\b/) || [])[0];
+        const qm = des.match(/\s(\d+)[,.]\d{3}\s+[A-Z]?\s*[\d\s]+[,.]\d{2}/), qt = qm ? Number(qm[1]) : 1;
+        const lines = ['Modèle ' + (lab === 'A49C' ? 'Collectif' : 'Industriel') + ' : ' + (lab || 'À définir'), kindLine];
+        for (const x of blk) {
+          let m; const nx = nz(x);
+          if (/^(LARGEUR|HAUTEUR)[^:]*:/i.test(x)) lines.push(x.replace(/\s*MM\s*$/i, 'mm').replace(/\s+/g, ' '));
+          else if ((m = x.match(/^COULEUR\s*:\s*(.+)$/i))) { const r = m[1].match(/RAL\s*:?\s*(\d{4})/i); if (r) lines.push('Couleur: RAL ' + r[1]); }
+          else if (/^(OUVERTURE )?MOTORISABLE$/.test(nx.toUpperCase())) lines.push("Type d'ouverture: Ouverture motorisable");
+          else if (/^(OUVERTURE )?MANUELLE?$/.test(nx.toUpperCase())) lines.push("Type d'ouverture: Ouverture manuelle");
+          else if (/^(OUVERTURE )?MOTORIS[EÉ]E?$/.test(x.toUpperCase().replace(/É/g, 'E'))) lines.push("Type d'ouverture: Ouverture motorisée");
+          else if (/^cremaill/.test(nx)) { if (/nylon/.test(nx)) lines.push('Crémaillère: Crémaillère nylon'); else if (/acier/.test(nx)) lines.push('Crémaillère: Crémaillère acier'); else lines.push('• ' + x.charAt(0) + x.slice(1).toLowerCase()); }   // só o material escrito (nylon / acier): «montée» sozinho não decide
+          else if (/^trappes? de visite/.test(nx)) lines.push('Trappe de visite: Oui');
+          else if (/^sens d/.test(nx) && (m = x.match(/:\s*(.+)$/))) { const v = nz(m[1]); if (/poussant|tirant/.test(v) && /droit|gauche/.test(v)) lines.push("Sens d'ouverture (vue de l'extérieur): " + (/poussant/.test(v) ? 'Poussant' : 'Tirant') + (/gauche/.test(v) ? ' gauche' : ' droit')); }
+          else lines.push('• ' + x.charAt(0) + x.slice(1).toLowerCase());
+        }
+        const prod = I.parseBlock(lines), notes = ['Lu par OCR : confirmez chaque valeur (surtout les mesures)'];
+        if (!lab && odd) notes.push('Modèle lu par OCR « ' + odd + ' » : non reconnu, à choisir');
+        specs.push({ prod, ind: lab, kind, qt, head: lines[0], title: des.replace(/\s\d+[,.]\d{3}.*$/, '').slice(0, 80), raw: lines.join('\n'), notes });
+      });
+      specs.unshift(...bvSpecs);
+      const products = specs.map(sp => { const pr = I.finishProd(sp.prod); if (sp.qt > 1 && pr.v) pr.v.qt = String(sp.qt); pr.notes = sp.notes; pr.head = sp.title || pr.head; return pr; });
+      const d = { isChiffreur: true, fromProfile: true, profileName: this.name, profile: 'ocrstruct', devis: '', client: o.societe, societe: o.societe, contact: '', address: [], tel: '', email: '', chantier: [o.ncde, o.ref].filter(Boolean).join(' '), ncde: '', refInt: '', clientCde: o.ncde, transport: '', ignored: [], products: [], ocr: true };
+      return { full: { devis: d, products, lines: c.L } };
+    },
+  });
+
+  // OCR (piloto, 12/11/2026): encomendas de clientes digitalizadas sem perfil (ex. «AFC Portillon grillagé A49. dimension 1.75x1.25 entre piliers … poteaux sur platine. droite poussant»):
+  // lê-se só o que o texto diz (tipo, modelo, medidas em metros, sentido se «poussant/tirant» e «droit/gauche» estão juntos); cor sem RAL e o resto ficam por preencher
+  PROFILES.push({
+    id: 'ocrfree', name: 'Encomenda digitalizada (OCR)',
+    match: c => c.L.some(l => l.ocr) && c.L.some(l => /^(\S+\s+)?(Portail|Portillon|Cl[ôo]ture)\b/i.test(l.text)),
+    parse(c) {
+      const T = c.T, o = { societe: '', address: [], contact: '', tel: '', email: '', ref: '', ncde: '' };
+      const nm = T.map(s => s.match(/Commande[^\d]{0,30}N[o°º]?\s*:?\s*([\d\s]{3,})/i)).find(Boolean); if (nm) o.ncde = nm[1].replace(/\s+/g, '');
+      const specs = [];
+      T.forEach((s, i) => {
+        if (!/^(\S+\s+)?(Portail|Portillon|Cl[ôo]ture)\b/i.test(s) || /^(Portail|Portillon) ?:/i.test(s)) return; if (/^(\S+\s+)?(Portail|Portillon|Cl[ôo]ture)\s+n[°o]?\s*\d+\s*$/i.test(s)) return;   // título «Portillon n°1» (a linha do produto vem a seguir)
+        const blk = [s]; for (let k = i + 1; k < Math.min(T.length, i + 6) && !/^(Total|TVA|Remises|Livraison|Paiement)/i.test(T[k]); k++) if (!/^Remise d[ée]duite/i.test(T[k])) blk.push(T[k]);
+        const txt = blk.join(' ').replace(/\s\d[\d.,]*\s+\d[\d.,]*\s+\d[\d.,]*\s+\d[\d.,]*\s*$/, ''), sp = freeText(txt);
+        const hm = txt.match(/hauteur\s*(\d)[.,](\d{2})\s*m?\s*[xX×]\s*(\d)[.,](\d{2})\s*m?(?!\d)/i), dm = txt.match(/(\d)[.,](\d{2})\s*m?\s*[xX×]\s*(\d)[.,](\d{2})(?!\d)/);
+        if (hm) { sp.H = Number(hm[1] + hm[2]) * 10; sp.L = Number(hm[3] + hm[4]) * 10; sp.dimNote = 'Hauteur × largeur lues en mètres (« ' + hm[0] + ' ») : à confirmer'; }   // altura escrita primeiro
+        else if (dm) { sp.L = Number(dm[1] + dm[2]) * 10; sp.H = Number(dm[3] + dm[4]) * 10; sp.dimNote = 'Medidas lidas em metros (« ' + dm[0] + ' ») : largeur × hauteur à confirmer'; }
+        if (!sp.sens) { const n = ' ' + nz(txt) + ' ', a = n.match(/ (poussant|tirant) /), b = n.match(/ (droit|droite|gauche) /); if (a && b) sp.sens = a[1][0].toUpperCase() + a[1].slice(1) + (b[1] === 'gauche' ? ' gauche' : ' droit'); }
+        sp.head = s.slice(0, 60); sp.title = s.replace(/^\S+\s+/, '').slice(0, 70); sp.raw = txt; sp.src = { L: txt, H: txt, sens: txt, fixPot: txt };
+        sp.notes = ['Lu par OCR : confirmez chaque valeur (surtout les mesures)', 'Produit lu sur une seule ligne de texte : cor, finition et options à vérifier'].concat(sp.dimNote ? [sp.dimNote] : []);
+        if (sp.kind && (sp.L || sp.ind)) specs.push(sp);
+      });
       return { client: o, specs };
     },
   });

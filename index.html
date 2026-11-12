@@ -1827,6 +1827,9 @@ viewBox="0 0 17206.5 4581.43"
 <script>// Traduções da página (o francês é o texto original e a chave). O PDF e o email para a Ferplay ficam sempre em francês.
 // [pt, en]
 const I18N_SRC = {
+  'Sans remplissage': ['Sem enchimento', 'Without infill'],
+  'Lu par OCR : confirmez chaque valeur (surtout les mesures)': ['Lido por OCR: confirme cada valor (sobretudo as medidas)', 'Read by OCR: confirm every value (especially measures)'],
+  'Document digitalisé lu par OCR : le texte peut contenir des erreurs. Confirmez chaque valeur (surtout les mesures) avant de générer l’ARC.': ['Documento digitalizado lido por OCR: o texto pode ter erros. Confirme cada valor (sobretudo as medidas) antes de gerar o ARC.', 'Scanned document read by OCR: the text may contain errors. Confirm every value (especially measures) before generating the ARC.'],
   'Aucun produit n’a pu être lu automatiquement dans ce PDF (format non reconnu). Ce qui a été lu (client, références) est ci-dessus : vérifiez-le, puis ajoutez les produits à la main.': ['Não foi possível ler nenhum produto automaticamente neste PDF (formato não reconhecido). O que foi lido (cliente, referências) está acima: confirme-o e depois acrescente os produtos à mão.', 'No product could be read automatically from this PDF (format not recognised). What was read (client, references) is shown above: check it, then add the products by hand.'],
   'Quantité (clôtures identiques, facultatif : sinon indiquez les largeurs en mètre linéaire)': ['Quantidade (vedações iguais, facultativo: senão indique as larguras em metro linear)', 'Quantity (identical fences, optional: otherwise give the widths in linear metres)'],
   'Quantité (clôtures identiques, facultatif : sinon indiquez les largeurs en mètre linéaire)': ['Quantidade (vedações iguais, facultativo: senão indique as larguras em metro linear)', 'Quantity (identical fences, optional: otherwise give the widths in linear metres)'],
@@ -3268,7 +3271,7 @@ function fieldsForAll(m, v) {
   }
   if (m.kind === 'cloture' && m.gamme !== 'st') { if (v0.lado === undefined) v0.lado = 'A'; add({ k: 'lado', sec: 'Observations', label: 'Côté de la grille (vue de l’extérieur)', type: 'radio', opts: [['D', 'Droite'], ['G', 'Gauche'], ['A', 'Les deux côtés']], req: false, nodeselect: true }); }
   if (m.kind === 'cloture' && m.gamme !== 'st') add({ k: 'sepArc', sec: 'Observations', label: 'Fiche séparée (ne pas inclure cette clôture dans la fiche du portail)', type: 'check' });
-  if (m.remplissage) add({ k: 'rempl', sec: 'Remplissage', label: 'Remplissage', type: 'radio', opts: m.remplissage, req: true });
+  if (m.remplissage) add({ k: 'rempl', sec: 'Remplissage', label: 'Remplissage', type: 'radio', opts: [...m.remplissage, ['__sans', 'Sans remplissage']], req: true });   // 12/11/2026 (Gonçalo): escolha explícita «sem remplissage» (conta como escolha válida; sem cruz no PDF)
   if (m.faceLos) add({ k: 'faceLos', sec: 'Remplissage', label: 'Barreaux carrés 25x25', type: 'radio', opts: [['face', 'Positionnés de face'], ['losange', 'En losange']], req: true });   // Herculeos Nº2B (tarif p.79)
   // --- motorização
   if (portail && (ouv === 'motorisable' || ouv === 'motorise') && m.crem) {
@@ -4244,7 +4247,7 @@ function ldgPdfValues(m, v) {
 const ALUI_RAL = ['RAL9010', 'RAL9005', 'RAL5003', 'RAL6005', 'RAL3004', 'RAL7016'];
 const ALUI_RAL_CL = ['RAL6005', 'RAL7016'];
 // remplissages: código → [nome no ARC, rótulo]
-const ALUI_RN = { BARR: ['', 'Barreaudé 30x30'], CITR: ['CITRINE', 'Citrine (barreaudé 100x20)'], PERI: ['PERIDOT', 'Péridot (plein, lames)'], TOPA: ['TOPAZE', 'Topaze (plein, lames)'], TOUR: ['TOURMALINE', 'Tourmaline (1/3 plein, 2/3 barreaudé)'],
+const ALUI_RN = { SANS: ['', 'Sans remplissage'], BARR: ['', 'Barreaudé 30x30'], CITR: ['CITRINE', 'Citrine (barreaudé 100x20)'], PERI: ['PERIDOT', 'Péridot (plein, lames)'], TOPA: ['TOPAZE', 'Topaze (plein, lames)'], TOUR: ['TOURMALINE', 'Tourmaline (1/3 plein, 2/3 barreaudé)'],
   TANZ: ['TANZANITE', 'Tanzanite (3/4 plein, 1/4 barreaudé)'], TANL: ['TANZANITE DECOUPE LASER', 'Tanzanite avec découpe laser (croix de Saint André)'], OPAL: ['OPALE', 'Opale (tôle, 1 traverse centrale)'],
   IRIS: ['IRIS', 'Iris (tôle, traverses intermédiaires)'], CANN: ['CANNISSE', 'Cannisse (barreaux Ø25 plaqués)'] };
 const ALUI_RB = ['BARR', 'PERI', 'TOPA', 'TOUR', 'TANZ', 'TANL', 'OPAL', 'IRIS', 'CANN'];       // battant e portillon ALU49c (tarif p.215–222)
@@ -4337,10 +4340,11 @@ if (typeof ALUIND_ON !== 'undefined' && ALUIND_ON) {
   for (const [c, label] of ALUI_CL)
     CAT['ALUI:' + c] = { code: 'ALUI:' + c, rcode: label, alu: true, mat: 'alu', fiche: 'industriel', label, gamme: 'ai', kind: 'cloture', fam: 'cl', rempls: null, sens: [], ouv: ['manuel'], couleurs: ALUI_RAL_CL, options: [], famille: 'alu-industriel' };
 }
-const aluiPleins = v => !!v.rempl && v.rempl !== 'BARR';
+const aluiR = v => v.rempl === 'SANS' ? 'BARR' : v.rempl;   // «sans remplissage» conta como o caso base (sem peças cheias) nos limites do tarif
+const aluiPleins = v => !!v.rempl && v.rempl !== 'BARR' && v.rempl !== 'SANS';
 // limites do tarif por modelo e remplissage (soft: avisos «à étudier par Ferplay», nunca bloqueiam)
 function aluLim(m, v) {
-  const r = v.rempl || '', op = r === 'OPAL' || r === 'IRIS';
+  const r = aluiR(v) || '', op = r === 'OPAL' || r === 'IRIS';
   if (m.fam === '49') return m.kind === 'portillon' ? { L: [1000, 1500], H: [1000, 2500] } : { L: [2000, 10000], H: [1000, 2500] };
   if (m.fam === '49c') {
     if (m.kind === 'portillon') return { L: [1000, 1500], H: [1000, op ? 2250 : 2500] };
@@ -4353,7 +4357,7 @@ function aluLim(m, v) {
 }
 // combinações L × H que o tarif marca como impossíveis («-» nas grelhas)
 function aluImpossible(m, v) {
-  const L = Number(v.L) || 0, H = Number(v.H) || 0, r = v.rempl || 'BARR';
+  const L = Number(v.L) || 0, H = Number(v.H) || 0, r = aluiR(v) || 'BARR';
   if (!L || !H) return false;
   if (m.fam === '49' && m.kind !== 'portillon') return H <= 1000 && L > 6000;
   if (m.fam === '45' && m.kind === 'coulissant') return r !== 'BARR' && H >= 2500 && L > 6000;
@@ -4406,7 +4410,7 @@ function fieldsAluInd(m, v) {
   const L = Number(v.L) || 0, H = Number(v.H) || 0, pl = aluiPleins(v);
   // --- remplissage (primeiro: dele dependem as medidas)
   if (m.rempls) {
-    add({ k: 'rempl', sec: 'Remplissage', label: 'Remplissage', type: 'select', opts: m.rempls.map(c => [c, ALUI_RN[c][1]]), req: true, wide: true });
+    add({ k: 'rempl', sec: 'Remplissage', label: 'Remplissage', type: 'select', opts: [...m.rempls.map(c => [c, ALUI_RN[c][1]]), ['SANS', ALUI_RN.SANS[1]]], req: true, wide: true });   // 12/11/2026 (Gonçalo): «Sans remplissage» explícito
     if (['PERI', 'TOPA', 'TOUR', 'TANZ', 'TANL'].includes(v.rempl)) {
       add({ k: 'lamesOr', sec: 'Remplissage', label: 'Orientation des lames', type: 'radio', opts: ['Horizontales', 'Verticales'], req: true });
       add({ k: 'lamesL', sec: 'Remplissage', label: 'Largeur des lames', type: 'radio', opts: ['100x20', '200x20'], req: true });
@@ -4567,7 +4571,7 @@ function aluProductPdf(p, m, v0, F, warnings) {
   if (v.m_palp) P.horsArc.push(t('Pré-équipement : prémontage du palpeur embarqué, passage du câble d’alimentation et douchette passe-fils'));
   if (m.kind === 'battant') P.vantaux = v.vantaux;
   // serrure: manual battant/portillon pergunta; coulissant/autoportant levam sempre (Locinox se barreaudé 30x30, Portac à crochet nos restantes); motorisable battant: sem serrure
-  if (m.fam === '45') { P.serrure = true; P.serLoc = (v.rempl || 'BARR') === 'BARR' || !!v.o_lsk; }
+  if (m.fam === '45') { P.serrure = true; P.serLoc = (aluiR(v) || 'BARR') === 'BARR' || !!v.o_lsk; }
   else P.serrure = v.serrure ? v.serrure === 'oui' : (motor ? false : undefined);
   if (v.finRal) P.horsArc.push(t('Finition de la couleur') + ' : ' + t(v.finRal));
   if (ouv === 'motorise' && v.m_src === 'ferplay' && v.m_app) P.kit = String(v.m_app).split(' – ')[0];
@@ -4600,6 +4604,7 @@ function aluProductPdf(p, m, v0, F, warnings) {
   if (v.platGonds) P.horsArc.push(t('Platines pour gonds orthogonaux (galvanisé peint, battants sans poteaux)'));
   // remplissage (o ARC só tem «MODÈLE»: tudo o resto vai para as Observations)
   if (rn && rn[0]) P.horsArc.push(t('Remplissage') + ' : ' + t(rn[1]));
+  if (v.rempl === 'SANS') P.horsArc.push(t('Remplissage') + ' : ' + t('Sans remplissage'));
   if (v.lamesOr) P.horsArc.push(t('Orientation des lames') + ' : ' + t(v.lamesOr) + ' ; ' + t('Largeur des lames') + ' : ' + v.lamesL);
   if (v.tole) P.horsArc.push(t('Tôle') + ' : ' + t({ pleine: 'Tôle pleine 30/10', R5T8: 'Tôle perforée ronde R5 T8 (sans plus-value)', C10U30: 'Tôle perforée carrée C10 U30 (plus-value de 12 %)' }[v.tole]));
   const ob = (k, lab, map) => { if (v[k]) P.horsArc.push(t(lab) + ' : ' + t(map[v[k]])); };
