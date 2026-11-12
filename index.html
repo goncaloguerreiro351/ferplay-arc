@@ -109,6 +109,7 @@ footer { color: var(--muted); font-size: 12.5px; margin-top: 22px }
 header.top > div:last-child { order: 2; flex: 1 1 320px; min-width: 0 }
 @media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth } }
 .f.need input{outline:3px solid #e8a317;outline-offset:1px;background:#fff8e1}.f.need label{color:#a36a00;font-weight:700}
+input.ta{width:100%;margin-bottom:4px;font-size:13px}
 .pdfpanel{border:1px solid var(--line);border-radius:10px;padding:12px;margin:10px 0;background:var(--surface)}
 .pdfhead{margin-bottom:8px}.pdfcard{margin:8px 0}.pdflog{margin:6px 0 0 18px;padding:0;font-size:13px}.pdflog .src{color:var(--muted)}
 #pdfBtn{flex:0 0 auto;white-space:nowrap;padding:8px 16px;border:0;border-radius:8px;background:var(--accent);color:#fff;font-weight:700;cursor:pointer;line-height:1.2}
@@ -189,8 +190,8 @@ viewBox="0 0 17206.5 4581.43"
   <section class="card" id="secClient">
     <h2>1. Vos coordonnées <small>une seule fois pour tous les produits</small></h2>
     <div class="f" data-c="typeDoc"><span class="lab req">Type de demande</span>
-      <div class="opts"><label class="opt"><input type="radio" name="c_typeDoc" value="prix"><span>Demande de prix</span></label>
-      <label class="opt"><input type="radio" name="c_typeDoc" value="commande"><span>Confirmation de commande</span></label></div></div>
+      <div class="opts"><label class="opt"><input type="radio" name="c_typeDoc" value="prix" data-desel="1"><span>Demande de prix</span></label>
+      <label class="opt"><input type="radio" name="c_typeDoc" value="commande" data-desel="1"><span>Confirmation de commande</span></label></div></div>
     <div class="grid">
       <div class="f" data-c="societe"><label class="req" for="c_societe">Société</label><input type="text" id="c_societe" autocomplete="organization"></div>
       <div class="f" data-c="ref"><label class="req" for="c_ref">Référence client / chantier</label><input type="text" id="c_ref"></div>
@@ -216,9 +217,9 @@ viewBox="0 0 17206.5 4581.43"
       <div class="f" data-c="gps"><label for="c_gps">Coordonnées GPS</label><input type="text" id="c_gps" placeholder="45.7578, 4.8320"><span class="hint">Facultatif.</span></div>
     </div>
     <div class="f" data-c="livraison"><span class="lab req">Transport</span>
-      <div class="opts"><label class="opt"><input type="radio" name="c_livraison" value="depot"><span>Au dépot: franco</span></label>
-      <label class="opt"><input type="radio" name="c_livraison" value="chantier"><span>Sur chantier (129€)</span></label>
-      <label class="opt"><input type="radio" name="c_livraison" value="grue"><span>Déchargement avec grue (323€)</span></label></div>
+      <div class="opts"><label class="opt"><input type="radio" name="c_livraison" value="depot" data-desel="1"><span>Au dépot: franco</span></label>
+      <label class="opt"><input type="radio" name="c_livraison" value="chantier" data-desel="1"><span>Sur chantier (129€)</span></label>
+      <label class="opt"><input type="radio" name="c_livraison" value="grue" data-desel="1"><span>Déchargement avec grue (323€)</span></label></div>
       <span class="hint">Transport par semi-remorque : vérifiez l'accessibilité du chantier.</span></div>
   </section>
 
@@ -1000,8 +1001,8 @@ viewBox="0 0 17206.5 4581.43"
     if (kind === 'cloture') {
       const trs = P.troncons || [];
       // 27/10/2026 (decisão 29): «À DROITE / À GAUCHE LARGEUR» = 1.º e 2.º troço (se houver mais, a lista completa fica no modelo e nas Observations)
-      name('MODELE_GRILLE', [P.modele, trs.length + ' ' + tr('Clôtures').toLowerCase(), ...(trs.length > 2 ? ['L1 ' + trs.map(x => x.L).join(' / ')] : [])].join(' – '), 6);
-      name('Á_DROITE_LARGEUR', trs[0] && trs[0].L); name('Á_GAUCHE_LARGEUR', trs[1] && trs[1].L);
+      name('MODELE_GRILLE', [P.modele, trs.length + ' ' + tr('Clôtures').toLowerCase(), ...(P.qtCl ? ['QT ' + P.qtCl] : []), ...(trs.length > 2 ? ['L1 ' + trs.map(x => x.L).join(' / ')] : [])].join(' – '), 6);
+      { const sw = sideWidths([{ P }]); name('Á_DROITE_LARGEUR', sw.right.join(' + ')); name('Á_GAUCHE_LARGEUR', sw.left.join(' + ')); }   // 12/11/2026: do lado escolhido (direita / esquerda / ambos)
       name('HAUTER_GRILLE', [...new Set(trs.map(x => x.H1 || x.H3 || x.H2).filter(Boolean))].join(' / '));
       if (P.forme) obs.push(tr('Type de clôture') + ' : ' + P.forme + (P.formeNom ? ' – ' + P.formeNom : ''));
       const q = Object.values(P.pot || {}).reduce((a, it) => { for (const [k, n] of Object.entries(it)) a[/sceller/i.test(k) ? 's' : 'v'] += Number(n) || 0; return a; }, { s: 0, v: 0 });
@@ -1043,18 +1044,19 @@ viewBox="0 0 17206.5 4581.43"
     }
     if (P.pose && P.poseTitre && !/^Standard/i.test(P.poseTitre)) obs.push(tr('Type de pose') + ' : ' + P.poseTitre);
     // poteaux
-    const [s1, s2] = String(P.potSec || '').split('/');
-    const fx = P.potFix === 'visser' ? /^A VISSER$/ : /^A SCELLER$/;
-    if (P.potS) { box(/^POTEAU DE SOUTIEN SECTION/); name('POTEAU_DE_SOUTIEN_SECTION_1', s1); name('POTEAU_DE_SOUTIEN_SECTION_2', s2); name('HAUTEUR_POTEAU_DE_SOUTIEN', P.potH); }
+    // 12/11/2026 (Gonçalo): secção e fixação por rôle (P.potSecX / P.potFixX); sem elas valem a secção e a fixação gerais
+    const sOf = k => String((P.potSecX || {})[k] || P.potSec || '').split('/'), fOf = k => (P.potFixX || {})[k] || P.potFix;
+    const fxRe = f => f === 'visser' ? /^A VISSER$/ : /^A SCELLER$/;
+    if (P.potS) { const [a, b] = sOf('potS'); box(/^POTEAU DE SOUTIEN SECTION/); name('POTEAU_DE_SOUTIEN_SECTION_1', a); name('POTEAU_DE_SOUTIEN_SECTION_2', b); name('HAUTEUR_POTEAU_DE_SOUTIEN', P.potH); }
     if (kind === 'coulissant' || kind === 'autoportant') {
-      if (P.potG === 'POTEAU') { box(/^POTEAU DE GUIDAGE SECTION/); name('POTEAU_DE_SOUTIEN_SECTION_1', s1); name('POTEAU_DE_SOUTIEN_SECTION_2', s2); name('HAUTEUR_POTEAU_DE_SOUTIEN', P.potH); }
-      if (P.potG === 'PORTIQUE') { box(/^PORTIQUE DE GUIDAGE SECTION/); name('PORTIQUE_DE_SOUTIEN_SECTION_1', s1); name('PORTIQUE_DE_SOUTIEN_SECTION_2', s2); name('HAUTEUR_PORTIQUE_DE_SOUTIEN', P.potH); }
-      if (P.potR === 'PORTIQUE') { box(/^PORTIQUE DE RECEPTION SECTION/); name('PORTIQUE_DE_RÉCEPTION_SECTION_1', s1); name('PORTIQUE_DE_RÉCEPTION_SECTION_2', s2); name('HAUTEUR_PORTIQUE_DE_RÉCEPTION_SECTION', P.potH); }
+      if (P.potG === 'POTEAU') { const [a, b] = sOf('potG'); box(/^POTEAU DE GUIDAGE SECTION/); name('POTEAU_DE_SOUTIEN_SECTION_1', a); name('POTEAU_DE_SOUTIEN_SECTION_2', b); name('HAUTEUR_POTEAU_DE_SOUTIEN', P.potH); }
+      if (P.potG === 'PORTIQUE') { const [a, b] = sOf('potG'); box(/^PORTIQUE DE GUIDAGE SECTION/); name('PORTIQUE_DE_SOUTIEN_SECTION_1', a); name('PORTIQUE_DE_SOUTIEN_SECTION_2', b); name('HAUTEUR_PORTIQUE_DE_SOUTIEN', P.potH); }
+      if (P.potR === 'PORTIQUE') { const [a, b] = sOf('potR'); box(/^PORTIQUE DE RECEPTION SECTION/); name('PORTIQUE_DE_RÉCEPTION_SECTION_1', a); name('PORTIQUE_DE_RÉCEPTION_SECTION_2', b); name('HAUTEUR_PORTIQUE_DE_RÉCEPTION_SECTION', P.potH); }
     }
-    if (P.potR === 'POTEAU') { box(/^POTEAU DE RECEPTION SECTION/); name('POTEAU_DE_RÉCEPTION_SECTION_1', s1); name('POTEAU_DE_RÉCEPTION_SECTION_2', s2); name('HAUTEUR_POTEAU_DE_RÉCEPTION_SECTION', P.potH); }
-    const hasPot = P.potS || P.potG === 'POTEAU' || P.potR === 'POTEAU', hasPort = P.potG === 'PORTIQUE' || P.potR === 'PORTIQUE';
-    if (hasPot && P.potFix) box(fx, { above: /POTEAU DE RECEPTION SECTION|RECEPTION SECTION X/ });
-    if (hasPort && P.potFix) box(fx, { above: /PORTIQUE DE RECEPTION|^RECEPTION SECTION X/, row: /MOTORISATION/ });
+    if (P.potR === 'POTEAU') { const [a, b] = sOf('potR'); box(/^POTEAU DE RECEPTION SECTION/); name('POTEAU_DE_RÉCEPTION_SECTION_1', a); name('POTEAU_DE_RÉCEPTION_SECTION_2', b); name('HAUTEUR_POTEAU_DE_RÉCEPTION_SECTION', P.potH); }
+    const potRoles = [P.potS ? 'potS' : '', P.potG === 'POTEAU' ? 'potG' : '', P.potR === 'POTEAU' ? 'potR' : ''].filter(Boolean), portRoles = [P.potG === 'PORTIQUE' ? 'potG' : '', P.potR === 'PORTIQUE' ? 'potR' : ''].filter(Boolean);
+    for (const f of new Set(potRoles.map(fOf).filter(Boolean))) box(fxRe(f), { above: /POTEAU DE RECEPTION SECTION|RECEPTION SECTION X/ });   // um à visser e outro à sceller: cruz nas duas
+    for (const f of new Set(portRoles.map(fOf).filter(Boolean))) box(fxRe(f), { above: /PORTIQUE DE RECEPTION|^RECEPTION SECTION X/, row: /MOTORISATION/ });
     if (P.potTrappe) box(/^TRAPPES (DE )?VISITE/);
     // opções
     for (const [id, val] of Object.entries(P.opts || {})) {
@@ -1134,15 +1136,15 @@ viewBox="0 0 17206.5 4581.43"
       if (Q.trait === 'BRUT') box(FER_TRAIT.BRUT);
       if (Q.ral) { box(/^COULEUR$/); name('COULEUR_RAL', Q.ralTxt, 7); }
       const sec2 = a => a && a.length === 2 && /^\d+$/.test(a[0]) && /^\d+$/.test(a[1]);
-      if (Q.pot) {
+      for (const QP of (Q.pots || (Q.pot ? [Q.pot] : []))) {
         // 07/11/2026 (Gonçalo): soutien / guidage / réception e trappe de visite
-        const rec = Q.pot.role === 'reception', gui = Q.pot.role === 'guidage';
+        const rec = QP.role === 'reception', gui = QP.role === 'guidage';
         box(rec ? /^POTEAU DE RECEPTION SECTION/ : (gui ? /^POTEAU DE GUIDAGE SECTION/ : /^POTEAU DE SOUTIEN SECTION/));
         const pre = rec ? 'POTEAU_DE_RÉCEPTION_SECTION' : 'POTEAU_DE_SOUTIEN_SECTION';
-        if (sec2(Q.pot.secA)) { name(pre + '_1', Q.pot.secA[0]); name(pre + '_2', Q.pot.secA[1]); }
-        if (Q.pot.H) name(rec ? 'HAUTEUR_POTEAU_DE_RÉCEPTION_SECTION' : 'HAUTEUR_POTEAU_DE_SOUTIEN', Q.pot.H);
-        if (Q.pot.fix) box(Q.pot.fix === 'visser' ? /^A VISSER$/ : /^A SCELLER$/, { above: /POTEAU DE RECEPTION SECTION|RECEPTION SECTION X/ });
-        if (Q.pot.trappe) box(/^TRAPPES (DE )?VISITE/);
+        if (sec2(QP.secA)) { name(pre + '_1', QP.secA[0]); name(pre + '_2', QP.secA[1]); }
+        if (QP.H) name(rec ? 'HAUTEUR_POTEAU_DE_RÉCEPTION_SECTION' : 'HAUTEUR_POTEAU_DE_SOUTIEN', QP.H);
+        if (QP.fix) box(QP.fix === 'visser' ? /^A VISSER$/ : /^A SCELLER$/, { above: /POTEAU DE RECEPTION SECTION|RECEPTION SECTION X/ });
+        if (QP.trappe) box(/^TRAPPES (DE )?VISITE/);
       }
       if (Q.port) {
         const rec = Q.port.role === 'reception';
@@ -1159,14 +1161,14 @@ viewBox="0 0 17206.5 4581.43"
       if (Q.ral) tx(/COULEUR RAL$/, String(Q.ral), 8);
       if (/texturé/i.test(Q.finTxt || '')) box(/^TEXTURE/); else if (/^mat/i.test(Q.finTxt || '')) box(/^MAT$/);
       if (Q.vant) { tx(/ L$/, Q.vant.L); tx(/H1$/, Q.vant.H); }
-      if (Q.pot) {
+      for (const QP of (Q.pots || (Q.pot ? [Q.pot] : []))) {
         // quantidade e altura hors sol na linha da secção (PTX-«secção» / HAUT-PTX-«secção»)
-        const s = String(Q.pot.sec || '').toUpperCase();
+        const s = String(QP.sec || '').toUpperCase();
         const h = s && M.texts.find(x => NZ(x.row).includes(s + ' - HAUTEUR HORS SOL'));
         const q = h && M.texts.filter(x => Math.abs(x.y - h.y) < 4 && x.x < h.x).sort((a, b) => b.x - a.x)[0];
-        if (h && q) { txt(q.name, Q.pot.qt); txt(h.name, Q.pot.Hs || Q.pot.H); }
-        else obs.push(tr('Poteaux') + ' ' + (Q.pot.sec || '') + ' × ' + Q.pot.qt + (Q.pot.Hs || Q.pot.H ? ' – H ' + (Q.pot.Hs || Q.pot.H) : ''));
-        if (Q.pot.fix === 'visser' && /^200X200$/.test(s)) box(/^PLATINE A VISSER POUR POTEAU/);
+        if (h && q) { txt(q.name, QP.qt); txt(h.name, QP.Hs || QP.H); }
+        else obs.push(tr('Poteaux') + ' ' + (QP.sec || '') + ' × ' + QP.qt + (QP.Hs || QP.H ? ' – H ' + (QP.Hs || QP.H) : ''));
+        if (QP.fix === 'visser' && /^200X200$/.test(s)) box(/^PLATINE A VISSER POUR POTEAU/);
       }
     }
   }
@@ -1482,15 +1484,15 @@ viewBox="0 0 17206.5 4581.43"
       txt('MODELE', P.modele, 7); if (Q.qt) txt('QT', Q.qt);
       if (Q.vant) { txt('HAUTER_A_LA_TRAVERSER_1', Q.vant.H); txt('LARGEUR_RAVERSER_1', Q.vant.L); }
       const num2 = a => a && a.length === 2 && /^\d+$/.test(a[0]) && /^\d+$/.test(a[1]);
-      if (Q.pot) {
+      for (const QP of (Q.pots || (Q.pot ? [Q.pot] : []))) {
         // 07/11/2026 (Gonçalo): soutien (battant) / guidage / réception (coulissant, ARC dos de correr); trappe de visite em todos
-        const rec = Q.pot.role === 'reception', gui = Q.pot.role === 'guidage';
+        const rec = QP.role === 'reception', gui = QP.role === 'guidage';
         box(gui ? 'potGuid' : (rec ? 'potRecep' : 'potSoutien'));
         const nm = rec ? T.recep : T.soutien;
-        if (num2(Q.pot.secA)) { txt(nm[0], Q.pot.secA[0]); txt(nm[1], Q.pot.secA[1]); }
-        if (Q.pot.H) txt(rec ? 'HAUTEUR_POTEAU_DE_RÉCEPTION_SECTION' : 'HAUTEUR_POTEAU_DE_SOUTIEN', Q.pot.H);
-        if (Q.pot.fix) box(Q.pot.fix === 'sceller' ? 'potS' : 'potV');
-        box('trappes', Q.pot.trappe);
+        if (num2(QP.secA)) { txt(nm[0], QP.secA[0]); txt(nm[1], QP.secA[1]); }
+        if (QP.H) txt(rec ? 'HAUTEUR_POTEAU_DE_RÉCEPTION_SECTION' : 'HAUTEUR_POTEAU_DE_SOUTIEN', QP.H);
+        if (QP.fix) box(QP.fix === 'sceller' ? 'potS' : 'potV');
+        box('trappes', QP.trappe);
       }
       if (Q.port) {
         const rec = Q.port.role === 'reception';
@@ -1562,13 +1564,12 @@ viewBox="0 0 17206.5 4581.43"
       box(P.potFix === 'sceller' ? 'grillePotS' : 'grillePotV', !!P.potFix);
     }
     // 07/11/2026 (Gonçalo): clôture juntada ao ARC do portão → bloco GRILLE (modelo, quantidade, comprimento, cor, altura, fixação dos poteaux); o resto vai para as Observations
-    if (!isCl && p.grille) {
-      const G = p.grille, GP = G.P || {}, gv = G.v || {};
-      txt('MODELE_GRILLE', [GP.modele || G.title, gv.qt ? `QT ${gv.qt}` : '', gv.L ? `L ${gv.L}` : '', GP.ral ? `RAL ${String(GP.ral).replace(/^RAL\s*/i, '')}` : ''].filter(Boolean).join(' – '), 7);
-      txt('HAUTER_GRILLE', gv.H);
-      box(GP.potFix === 'sceller' ? 'grillePotS' : 'grillePotV', !!GP.potFix);
-      obsLines.push(...(GP.horsArc || []).map(x => tr('Clôture') + ' : ' + x));
-      if (G.obs) obsLines.push(tr('Clôture') + ' : ' + G.obs);
+    if (!isCl && !P.tpl && (p.grilles || []).length) {
+      const GS = p.grilles, nr = x => String(x || '').replace(/^RAL\s*/i, '');
+      txt('MODELE_GRILLE', GS.map(G => [(G.P || {}).modele || G.title, (G.v || {}).qt ? `QT ${G.v.qt}` : '', (G.v || {}).L ? `L ${(G.v || {}).L}` : '', (G.P || {}).ral ? `RAL ${nr(G.P.ral)}` : ''].filter(Boolean).join(' – ')).join(' + '), GS.length > 1 ? 6 : 7);
+      txt('HAUTER_GRILLE', [...new Set(GS.map(G => (G.v || {}).H).filter(Boolean))].join(' / '));
+      const pf = GS.map(G => (G.P || {}).potFix).filter(Boolean); if (pf.includes('sceller')) box('grillePotS', true); if (pf.includes('visser')) box('grillePotV', true);
+      for (const G of GS) { const ld = (G.P || {}).lado; if (ld === 'D' || ld === 'G') obsLines.push(tr('Clôture') + ' : ' + tr(ld === 'D' ? 'Droite' : 'Gauche').toLowerCase()); obsLines.push(...((G.P || {}).horsArc || []).map(x => tr('Clôture') + ' : ' + x)); if (G.obs) obsLines.push(tr('Clôture') + ' : ' + G.obs); }
     }
     // acabamento
     if (P.trait === 'GAL') box('sendz');
@@ -1597,6 +1598,18 @@ viewBox="0 0 17206.5 4581.43"
       const pg = doc.getPages()[0];
       pg.drawText(ansi(tr('Observations')), { x: 185, y: PAGE_H - 229, size: 7, font: bold, color: rgb(0.2, 0.2, 0.2) });
       form.createTextField('Observations').addToPage(pg, { x: 185, y: PAGE_H - 274, width: 187, height: 42, borderWidth: 0.6, borderColor: rgb(0.6, 0.6, 0.6), font });
+    }
+    // Ferro Habitat: grades juntadas ao ARC do portão (bloco GRILLE: modelo, nº de troços, larguras à direita / à esquerda, altura)
+    if (v.kind !== 'cloture' && P.tpl && (p.grilles || []).length) {
+      const GS = p.grilles, trs = GS.flatMap(G => (G.P || {}).troncons || []), mods = [...new Set(GS.map(G => (G.P || {}).modele).filter(Boolean))];
+      txt('MODELE_GRILLE', [mods.join(' + '), trs.length + ' ' + tr('Clôtures').toLowerCase(), ...GS.filter(G => (G.P || {}).qtCl).map(G => 'QT ' + G.P.qtCl)].filter(Boolean).join(' – '), 6);
+      { const sw = sideWidths(GS); txt('Á_DROITE_LARGEUR', sw.right.join(' + ')); txt('Á_GAUCHE_LARGEUR', sw.left.join(' + ')); }
+      txt('HAUTER_GRILLE', [...new Set(trs.map(x => x.H1 || x.H3 || x.H2).filter(Boolean))].join(' / '));
+      for (const G of GS) { const GP = G.P || {}, ts = GP.troncons || [];
+        obsLines.push(tr('Clôture') + ' : ' + (GP.modele ? GP.modele + ' – ' : '') + ts.map((x, i) => `${i + 1}) L ${x.L}${x.H1 ? ' / H ' + x.H1 : ''}`).join(' ; '));
+        for (const [code, items] of Object.entries(GP.pot || {})) { const d = Object.entries(items).filter(([, n]) => Number(n) > 0).map(([k2, n]) => `${k2} × ${n}`); if (d.length) obsLines.push(`${tr('Poteaux')} ${code} : ${d.join(', ')}`); }
+        if (GP.ral) obsLines.push(tr('Clôture') + ' RAL ' + String(GP.ral).replace(/^RAL\s*/i, ''));
+      }
     }
     const opts = [...obsLines, ...(FI ? [] : (P.horsArc || []))];
     const obsTxt = [
@@ -1684,17 +1697,28 @@ viewBox="0 0 17206.5 4581.43"
 
   // Junta cada clôture do Ferro Industriel ao ARC do portão que a antecede (o ARC tem o bloco GRILLE). Fica à parte se o cliente o pedir (P.sepArc),
   // se não houver portão antes, ou se for de outra família (Habitat, standard com ARC próprio, Alu, peças, garde-corps, Régionale).
+  // larguras (L) por lado: D → à direita; G → à esquerda; A → alterna (1.º à direita, 2.º à esquerda…)
+  function sideWidths(grs) {
+    const right = [], left = []; let alt = 0;
+    for (const G of grs) for (const x of ((G.P || {}).troncons || [])) { const l = (G.P || {}).lado || 'A'; if (l === 'D') right.push(x.L); else if (l === 'G') left.push(x.L); else { (alt % 2 === 0 ? right : left).push(x.L); alt++; } }
+    return { right, left };
+  }
   function mergeGrilles(ps) {
+    // 12/11/2026 (Gonçalo): as grades (Ferro Industriel e Ferro Habitat) vão no MESMO ARC do portão que as antecede (o ARC tem o bloco GRILLE): uma (um lado) ou duas (os dois lados)
     const out = []; let open = null;
     const plain = p => { const P = p.pdf || {}; return !P.tpl && !P.pieces && !P.ldg && !P.aluInd && !P.surMesure && !(P.std && ARC_STD && ARC_STD[P.std.tpl]); };
+    const ferHab = p => { const P = p.pdf || {}; return !!(P.tpl && FERHAB_ZONES[P.tpl] && !P.pieces); };
+    const gate = p => ['battant', 'coulissant', 'autoportant', 'portillon'].includes((p.v || {}).kind);
     for (const p of ps) {
       const k = (p.v || {}).kind;
-      if (plain(p) && ['battant', 'coulissant', 'autoportant', 'portillon'].includes(k)) { open = p; out.push(p); continue; }
-      if (plain(p) && k === 'cloture' && !(p.pdf || {}).sepArc && open && !open.grille) {
-        open.grille = { v: p.v, P: p.pdf || {}, obs: p.obs, title: p.title };
+      if ((plain(p) || ferHab(p)) && gate(p)) { open = p; out.push(p); continue; }
+      const fam = plain(p) ? 'ind' : (ferHab(p) ? 'fh' : '');
+      if (fam && k === 'cloture' && !(p.pdf || {}).sepArc && open && ((fam === 'ind' && plain(open)) || (fam === 'fh' && ferHab(open))) && (open.grilles || []).length < 2) {
+        const g = { v: p.v, P: p.pdf || {}, obs: p.obs, title: p.title };
+        open.grilles = [...(open.grilles || []), g]; if (!open.grille) open.grille = g;
         if (p.status === 'orange') open.status = 'orange';
         open.warnings = [...(open.warnings || []), ...(p.warnings || [])];
-        open = null; continue;
+        continue;
       }
       out.push(p);
     }
@@ -1803,6 +1827,15 @@ viewBox="0 0 17206.5 4581.43"
 <script>// Traduções da página (o francês é o texto original e a chave). O PDF e o email para a Ferplay ficam sempre em francês.
 // [pt, en]
 const I18N_SRC = {
+  'Aucun produit n’a pu être lu automatiquement dans ce PDF (format non reconnu). Ce qui a été lu (client, références) est ci-dessus : vérifiez-le, puis ajoutez les produits à la main.': ['Não foi possível ler nenhum produto automaticamente neste PDF (formato não reconhecido). O que foi lido (cliente, referências) está acima: confirme-o e depois acrescente os produtos à mão.', 'No product could be read automatically from this PDF (format not recognised). What was read (client, references) is shown above: check it, then add the products by hand.'],
+  'Quantité (clôtures identiques, facultatif : sinon indiquez les largeurs en mètre linéaire)': ['Quantidade (vedações iguais, facultativo: senão indique as larguras em metro linear)', 'Quantity (identical fences, optional: otherwise give the widths in linear metres)'],
+  'Quantité (clôtures identiques, facultatif : sinon indiquez les largeurs en mètre linéaire)': ['Quantidade (vedações iguais, facultativo: senão indique as larguras em metro linear)', 'Quantity (identical fences, optional: otherwise give the widths in linear metres)'],
+  'Côté de la grille (vue de l’extérieur)': ['Lado da grade (vista do exterior)', 'Side of the fence (seen from outside)'],
+  'Droite': ['Direita', 'Right'], 'Gauche': ['Esquerda', 'Left'], 'Les deux côtés': ['Ambos os lados', 'Both sides'],
+  'Écrire pour filtrer la liste…': ['Escreva para filtrar a lista…', 'Type to filter the list…'],
+  'Indiquez le nombre de panneaux OU la longueur totale (mètre linéaire).': ['Indique o número de painéis OU o comprimento total (metro linear).', 'Enter the number of panels OR the total length (linear metres).'],
+  'Longueur totale de la clôture (mètre linéaire)': ['Comprimento total da vedação (metro linear)', 'Total fence length (linear metres)'],
+  'Blanc': ['Branco', 'White'], 'Gris': ['Cinzento', 'Grey'], 'Vert': ['Verde', 'Green'],
   // cabeçalho, faixas, estado
   'Pivots à roulement à billes : fixation': ['Pivots de rolamento de esferas: fixação', 'Ball-bearing pivots: fixing'],
   'Finition de la couleur': ['Finição da cor', 'Colour finish'],
@@ -3151,9 +3184,10 @@ function fieldsForAll(m, v) {
       // 27/10/2026 (decisão 12): menos de 10 painéis aceita-se com aviso «+10 %» (antes bloqueava)
       add({ k: 'qt', sec: 'Dimensions', label: 'Nombre de panneaux', type: 'number', req: true, min: 1, max: 9999, hard: true, hint: m.qtymin ? tf('À partir de {n} panneaux ; en dessous : plus-value de 10 %.', { n: m.qtymin }) : '' });
     } else {
-      add({ k: 'qt', sec: 'Dimensions', label: 'Nombre de panneaux', type: 'number', req: true, min: 1, max: 999, hard: true });
+      // 12/11/2026 (Gonçalo): nombre de panneaux OU mètre linéaire (longueur totale): basta um dos dois
+      add({ k: 'qt', sec: 'Dimensions', label: 'Nombre de panneaux', type: 'number', req: !(Number(v0.L) > 0), min: 1, max: 999, hard: true, hint: t('Indiquez le nombre de panneaux OU la longueur totale (mètre linéaire).') });
       add({ k: 'H', sec: 'Dimensions', label: 'Hauteur', type: 'number', unit: 'mm', req: true, min: m.H[0], max: m.H[m.H.length - 1], soft: true });
-      add({ k: 'L', sec: 'Dimensions', label: 'Longueur totale de la clôture', type: 'number', unit: 'mm', req: true, min: 100, max: 99999, hard: true });
+      add({ k: 'L', sec: 'Dimensions', label: 'Longueur totale de la clôture (mètre linéaire)', type: 'number', unit: 'mm', req: !(Number(v0.qt) > 0), min: 100, max: 99999, hard: true });
     }
   } else {
     const LL = m.kind === 'battant' || m.kind === 'portillon' ? 'Largeur entre piliers' : 'Largeur de passage';
@@ -3215,7 +3249,7 @@ function fieldsForAll(m, v) {
     add({ k: 'fixPot', sec: 'Poteaux', label: 'Fixation des poteaux', type: 'radio', opts: m.fixPoteaux || ['À visser', 'À sceller'], req: true });
     // 05/11/2026 (feedback interno): trappe de visite pré-preenchida (alterável): portillon ou abertura manual = Non; motorisé / motorisable = Oui
     const trDef = (m.kind === 'portillon' || ouv === 'manuel') ? 'Non' : ((ouv === 'motorise' || ouv === 'motorisable') ? 'Oui' : '');
-    if (trDef && (v0.trappe === undefined || v0.trappe === '' || v0.trappe === v0.trappeAuto)) { v0.trappe = trDef; v0.trappeAuto = trDef; }
+    if (trDef && ((v0.trappeAuto === undefined && (v0.trappe === undefined || v0.trappe === '')) || (v0.trappe !== undefined && v0.trappe !== '' && v0.trappe === v0.trappeAuto))) { v0.trappe = trDef; v0.trappeAuto = trDef; }   // 12/11/2026 (Gonçalo): o valor por defeito só se aplica enquanto o utilizador não desseleciona; desselecionada, a validação pede a escolha
     add({ k: 'trappe', sec: 'Poteaux', label: 'Trappe de visite', type: 'radio', opts: ['Oui', 'Non'], req: true });
   }
   if (m.rail || (INTERNE && m.kind === 'coulissant')) add({ k: 'rail', sec: 'Poteaux', label: 'Rail au sol', type: 'radio', opts: [['visser', 'À visser (tôle pliée 4 × 75 mm)'], ['sceller', 'À sceller (profil oméga 55 × 55)'], ['sem', 'Sans guide au sol']], req: !!m.rail });   // 05/11/2026 (Sónia, A45): também sem guia no chão
@@ -3232,6 +3266,7 @@ function fieldsForAll(m, v) {
       add({ k: 'potFix', sec: 'Poteaux', label: 'Fixation des poteaux', type: 'radio', opts: [['sceller', 'À sceller'], ['visser', 'À visser']], req: (Number(v.potE) || 0) + (Number(v.potI) || 0) + (Number(v.potA) || 0) > 0 });   // 07/11/2026 (Gonçalo): há grades sem poteaux: só obrigatório se houver poteaux
     }
   }
+  if (m.kind === 'cloture' && m.gamme !== 'st') { if (v0.lado === undefined) v0.lado = 'A'; add({ k: 'lado', sec: 'Observations', label: 'Côté de la grille (vue de l’extérieur)', type: 'radio', opts: [['D', 'Droite'], ['G', 'Gauche'], ['A', 'Les deux côtés']], req: false, nodeselect: true }); }
   if (m.kind === 'cloture' && m.gamme !== 'st') add({ k: 'sepArc', sec: 'Observations', label: 'Fiche séparée (ne pas inclure cette clôture dans la fiche du portail)', type: 'check' });
   if (m.remplissage) add({ k: 'rempl', sec: 'Remplissage', label: 'Remplissage', type: 'radio', opts: m.remplissage, req: true });
   if (m.faceLos) add({ k: 'faceLos', sec: 'Remplissage', label: 'Barreaux carrés 25x25', type: 'radio', opts: [['face', 'Positionnés de face'], ['losange', 'En losange']], req: true });   // Herculeos Nº2B (tarif p.79)
@@ -3310,7 +3345,11 @@ function fieldsForAll(m, v) {
   add({ k: 'obs', sec: 'Observations', label: 'Observations pour ce produit (demandes particulières, modifications…)', type: 'textarea' });
   return F;
 }
-const optVal = o => Array.isArray(o) ? o : [o, o];
+const optVal = o => Array.isArray(o) ? o : [o, o];
+// escolhas únicas que NÃO se desselecionam: têm um valor por defeito imposto pela regra (a lógica voltaria a preenchê-lo) — trappe (por defeito calculado), hRef (H1 fixa), rôle dos poteaux das peças, lado das grades
+const NODESEL = new Set(['hRef', 'lado']);
+// 12/11/2026 (Gonçalo): as listas de RAL aparecem por ordem numérica (as opções que não são RAL — nomes, «Autre RAL» — ficam no fim, na ordem original)
+function sortRal(opts) { const rn = o => { const m = String(optVal(o)[0]).match(/^RAL\s*(\d{4})$/); return m ? Number(m[1]) : null; }; const r = opts.filter(o => rn(o) !== null); if (r.length < 3) return opts; return [...r.sort((a, b) => rn(a) - rn(b)), ...opts.filter(o => rn(o) === null)]; }
 // ======================= Habitat (Alu; depois Acier e Collectif) =======================
 // Regras lidas do Chiffreur (habitat_cat.js / dados_chiffreur_habitat_collectif.json). Os modelos entram no CAT com a
 // chave «H:<código>|<tipo>» e m.hab = true; fieldsFor / productPdf / material desviam para as funções daqui.
@@ -3716,7 +3755,9 @@ function fieldsHab(m, v) {
   // cor (Acier: depende do tratamento; galvanisé à chaud sem cor; primaire só as cores de primário)
   const cpt = (HABR(r.traitements) || {}).couleursParTraitement || {};
   const cols = v.trait && cpt[v.trait] ? cpt[v.trait].map(c => ({ reference: c.ref, nom: c.t })) : habColors(m);
-  if (!(v.trait === 'BRUT' || (v.trait && cpt[v.trait] && !cpt[v.trait].length))) add({ k: 'coul', sec: 'Finition', label: 'Couleur', type: 'select', opts: [...cols.map(c => [c.reference, `${c.reference.replace(/^RAL/, 'RAL ')} – ${c.nom}`]), ['__autre', 'Autre RAL (saisie manuelle)']], req: true });
+  const ppr = m.famille === 'fer-habitat' && v.trait === 'PPR';   // 12/11/2026 (Gonçalo): primaire anti-rouille: só Blanc / Gris / Noir / Vert (sem RAL)
+  if (ppr) add({ k: 'coul', sec: 'Finition', label: 'Couleur', type: 'radio', opts: [['BLANC', 'Blanc'], ['GRIS', 'Gris'], ['NOIR', 'Noir'], ['VERT', 'Vert']], req: true });
+  else if (!(v.trait === 'BRUT' || (v.trait && cpt[v.trait] && !cpt[v.trait].length))) add({ k: 'coul', sec: 'Finition', label: 'Couleur', type: 'select', opts: [...cols.map(c => [c.reference, `${c.reference.replace(/^RAL/, 'RAL ')} – ${c.nom}`]), ['__autre', 'Autre RAL (saisie manuelle)']], req: true });
   if (v.coul === '__autre' && v.trait !== 'BRUT' && !(v.trait && cpt[v.trait])) add({ k: 'ralAutre', sec: 'Finition', label: 'Référence RAL', type: 'text', req: true, hint: t('Attention, voir la disponibilité du RAL hors standard avec l’usine.'), hintRed: true });
   const fins = v.coul && v.coul !== '__autre' ? habFinitions(m, v.coul) : habFinitions(m, '');
   if (fins.length) add({ k: 'fin', sec: 'Finition', label: 'Finition', type: 'radio', opts: fins, req: true, deselect: true });
@@ -3769,7 +3810,13 @@ function fieldsHab(m, v) {
       // 03/11/2026 (respostas do Gonçalo): secções principais 100x100, 120x120, 150x150 e 200x200 primeiro; altura sempre ao solo, sugerida e editável:
       // H + 90 em todos os tipos, H + 130 com lisse défensive (igual ao Industriel; confirmado 03/11/2026)
       const mainS = ['100/100', '120/120', '150/150', '200/200'], secsF = [...mainS.filter(x => pt.sections.includes(x)), ...pt.sections.filter(x => !mainS.includes(x))];
-      add({ k: 'potSec', sec, label: 'Section des poteaux', type: 'select', opts: secsF.map(x => [x, x]), req: true });
+      add({ k: 'potSec', sec, label: roles.filter(([k]) => v[k]).length > 1 ? 'Section des poteaux (par défaut, tous les rôles)' : 'Section des poteaux', type: 'select', opts: secsF.map(x => [x, x]), req: true });
+      // 12/11/2026 (Gonçalo): dois rôles (guidage + réception, ou soutien + réception): cada um pode ter secção e fixação próprias (vazio = como acima); o mesmo rôle não se repete (cada rôle tem a sua escolha única)
+      if (roles.filter(([k]) => v[k]).length > 1) for (const [k, lab] of roles) if (v[k]) {
+        const rl = { potS: 'Poteaux de soutien', potG: 'Poteau de guidage', potR: 'Poteau de réception' }[k];
+        add({ k: 'potSecX_' + k, sec, label: tf('{p} – section', { p: t(rl) }), type: 'select', opts: [['', 'Comme ci-dessus'], ...secsF.map(x => [x, x])], req: false });
+        add({ k: 'potFixX_' + k, sec, label: tf('{p} – fixation', { p: t(rl) }), type: 'radio', opts: [['sceller', 'À sceller'], ['visser', 'Sur platine (à visser)']], req: false });
+      }
       { const base = Number(v.H) || 0, dl = (v.fo_ld ? 130 : 90) + (v.potFix === 'sceller' ? 500 : 0);   // 05/11/2026: à sceller soma 500 mm de chumbamento (como no Industriel)
         if (v.potHSug) { if (v.potH === v.potHSug) delete v.potH; delete v.potHSug; }   // 05/11/2026 (Gonçalo): a altura dos pilares nunca se preenche nem se sugere (só se vê no desenho)
         add({ k: 'potH', sec, label: 'Hauteur des poteaux', type: 'number', unit: 'mm', req: false, min: 0, max: 9999, hard: true }); }
@@ -3866,7 +3913,9 @@ function habPdfValues(m, v) {
   P.potGuiOn = !!v.potGuiOn; P.potGuiQt = Number(v.potGuiQt) || 1; P.potGui = v.potGuiOn ? v.potGui : '';
   P.gache = v.gache ? v.gacheT : undefined;
   P.trait = v.trait; P.potS = v.potS; P.potG = v.potG; P.potR = v.potR; P.potH = v.potH; P.potFix = v.potFix; P.potTrappe = !!v.potTrappe;
+  P.potSecX = { potS: v.potSecX_potS, potG: v.potSecX_potG, potR: v.potSecX_potR }; P.potFixX = { potS: v.potFixX_potS, potG: v.potFixX_potG, potR: v.potFixX_potR };   // 12/11/2026: secção / fixação por rôle
   if (m.famille === 'fer-habitat') {   // 03/11/2026: quantidade e posição dos poteaux vão para as Observations
+    { const ch = ['potS', 'potG', 'potR'].filter(k => v[k]), fx = ch.map(k => v['potFixX_' + k] || v.potFix); if (ch.length > 1 && new Set(fx).size > 1) { const RL = { potS: 'poteau de soutien', potG: 'poteau de guidage', potR: 'poteau de réception' }; P.horsArc.push('Fixation des poteaux : ' + ch.map((k, i) => `${RL[k]} ${fx[i] === 'sceller' ? 'à sceller' : 'à visser'}`).join(' ; ')); } }   // um à visser e outro à sceller: o ARC tem uma só opção → cruz nas duas e a precisão nas Observations
     const ORI = { FRONTAL: 'Frontal', LATERAL: 'Latéral', EXTERIEUR: 'Extérieur', INTERIEUR: 'Intérieur' };
     for (const [k, lab] of [['potS', 'Poteaux de soutien'], ['potG', 'Poteau de guidage'], ['potR', 'Poteau de réception']]) if (v[k] === 'POTEAU') P.horsArc.push(`${t(lab)} : ${v[k + 'Qt'] || 1}${v[k + 'Ori'] ? ' ' + t(ORI[v[k + 'Ori']]).toLowerCase() : ''}`);
   }
@@ -3915,6 +3964,8 @@ function fieldsHabCloture(m, v) {
     else delete v.lzLado;
   } else { delete v.lzOr; delete v.lzLado; }
   if (m.tipoCl && v.forme === 'LI') add({ k: 'liInfo', sec: 'Modèle', type: 'info', text: t('Kit de lames inclinées 80x20 : poteaux 100x100 uniquement, écart maximum entre poteaux 2 m (1,5 m selon la hauteur).') });
+  add({ k: 'qtCl', sec: 'Dimensions', label: 'Quantité (clôtures identiques, facultatif : sinon indiquez les largeurs en mètre linéaire)', type: 'number', req: false, min: 1, max: 999, hard: true });   // 12/11/2026 (Gonçalo): à medida = metro linear OU quantidade
+  add({ k: 'qtCl', sec: 'Dimensions', label: 'Quantité (clôtures identiques, facultatif : sinon indiquez les largeurs en mètre linéaire)', type: 'number', req: false, min: 1, max: 999, hard: true });   // 12/11/2026 (Gonçalo): à medida = metro linear OU quantidade
   // troços
   add({ k: 'nTr', sec: 'Dimensions', label: kind === 'kl' ? 'Nombre de travées' : 'Nombre de clôtures (tronçons)', type: 'select', opts: [1, 2, 3, 4, 5, 6].map(n => [String(n), String(n)]), req: true });
   const hs = cl.hauteurs || [], hmin = hs.length ? Math.min(...hs) : 0, hmax = hs.length ? Math.max(...hs) : 9999;
@@ -3937,9 +3988,12 @@ function fieldsHabCloture(m, v) {
       if (kind === 'bv') {
         add(h3); add(h2); add(h1);
         add({ k: 'H0_' + i, sec, label: 'Hauteur clôture hors muret (à la lisse haute) – H0', type: 'number', unit: 'mm', req: false, min: 0, max: 5000, hard: true });
-      } else { if (kind === 'as') h1.hint = t('Indiquez au moins une des hauteurs H1, H2 ou H3 (les autres sont facultatives).'); add(h1); add(h2); add(h3); }
+      } else if (m.famille === 'fer-habitat') { h1.label = 'Hauteur'; h1.req = true; add(h1); }   // 12/11/2026 (Gonçalo): no Ferro só existe «H» (H1/H2/H3 são do Alu)
+      else { if (kind === 'as') h1.hint = t('Indiquez au moins une des hauteurs H1, H2 ou H3 (les autres sont facultatives).'); add(h1); add(h2); add(h3); }
     }
   }
+  if (m.famille === 'fer-habitat') { if (v.lado === undefined) v.lado = 'A'; add({ k: 'lado', sec: 'Dimensions', label: 'Côté de la grille (vue de l’extérieur)', type: 'radio', opts: [['D', 'Droite'], ['G', 'Gauche'], ['A', 'Les deux côtés']], req: false, nodeselect: true }); }   // 12/11/2026 (Gonçalo): Direita / Esquerda / Ambos (por defeito Ambos)
+  if (m.famille === 'fer-habitat') add({ k: 'sepArc', sec: 'Observations', label: 'Fiche séparée (ne pas inclure cette clôture dans la fiche du portail)', type: 'check' });
   // poteaux
   const ps = 'Poteaux (quantités)';
   if (kind === 'as' && cl.poteaux) {
@@ -3994,7 +4048,7 @@ function fieldsHabCloture(m, v) {
 }
 function habPdfCloture(m, v, P) {
   const kind = habClKind(m), n = habTroncons(v);
-  P.clKind = kind; P.troncons = [];
+  P.clKind = kind; P.troncons = []; P.sepArc = !!v.sepArc; P.lado = v.lado || 'A'; P.qtCl = Number(v.qtCl) > 1 ? Number(v.qtCl) : 0; P.qtCl = Number(v.qtCl) > 1 ? Number(v.qtCl) : 0;
   for (let i = 1; i <= n; i++) P.troncons.push({ L: v['L_' + i], H0: v['H0_' + i], H1: v['H1_' + i], H2: v['H2_' + i], H3: v['H3_' + i], E15: v['E15_' + i], E20: v['E20_' + i] });
   const cl = m.rec.cloture || {};
   P.pot = {};
@@ -4598,7 +4652,7 @@ function validateProduct(m, v) {
   }
   if (m.pieces) for (const e of piecesErrors(m, v)) errors.push(e);   // 05/11/2026: nenhuma peça escolhida / quantidades a zero
   // 27/10/2026: clôtures (grades): só é obrigatória UMA das alturas H1, H2, H3 por troço
-  if (m.hab && m.kind === 'cloture' && habClKind(m) === 'as') for (let i = 1; i <= habTroncons(v); i++) if (!['H1_', 'H2_', 'H3_'].some(x => Number(v[x + i]) > 0)) { const s = 'Indiquez au moins une hauteur (H1, H2 ou H3)'; errors.push({ k: 'H1_' + i, msg: s, ui: t(s) + (habTroncons(v) > 1 ? ` (${i})` : ''), short: t('Champ obligatoire') }); }
+  if (m.hab && m.kind === 'cloture' && habClKind(m) === 'as' && m.famille !== 'fer-habitat') for (let i = 1; i <= habTroncons(v); i++) if (!['H1_', 'H2_', 'H3_'].some(x => Number(v[x + i]) > 0)) { const s = 'Indiquez au moins une hauteur (H1, H2 ou H3)'; errors.push({ k: 'H1_' + i, msg: s, ui: t(s) + (habTroncons(v) > 1 ? ` (${i})` : ''), short: t('Champ obligatoire') }); }
   if (m.hab && m.famille === 'fer-habitat' && m.kind !== 'cloture' && !m.catalogueOnly && ((Number(v.L) || 0) > 5000 || (Number(v.H) || 0) > 2500)) { const s = 'Au-delà de 5 m × 2,5 m : à étudier par Ferplay'; warnings.push({ k: 'L', msg: s, ui: t(s) }); }
   if (m.hab && m.famille === 'alu-habitat') for (const w of habAluWarn(m, v)) warnings.push(w);   // 27/10/2026 (decisões 31, 42, 43): avisos do Alumínio Habitat
   if (m.alu) for (const w of aluIndWarn(m, v)) warnings.push(w);   // 28/10/2026 (decisão 44): avisos do Alumínio Industriel
@@ -4770,6 +4824,7 @@ function productPdfIn(p) {
   if (v.fixPot) P.potFix = v.fixPot === 'À sceller' ? 'sceller' : 'visser';
   P.trait = v.trait;
   if (m.kind === 'cloture') for (const [k, l] of [['potE', "Poteaux d'extrémité"], ['potI', 'Poteaux intermédiaires'], ['potA', "Poteaux d'angle"]]) if (Number(v[k]) > 0) P.horsArc.push(t(l) + ' : ' + v[k]);   // 07/11/2026: quantidades dos poteaux das clôtures sur mesure (antes não iam para o ARC)
+  if (m.kind === 'cloture') P.lado = v.lado || 'A';
   if (m.kind === 'cloture' && v.sepArc) P.sepArc = true;   // 07/11/2026 (Gonçalo): por defeito a clôture vai no mesmo ARC do portão (bloco GRILLE); «Fiche séparée» mantém-na à parte
   if (v.coul && (v.trait !== 'GALVA' || v.galvaLaq === 'avec')) P.ral = v.coul === '__autre' ? v.ralAutre : v.coul;
   if (/^Grillagé/.test(v.rempl || '')) A.grillage = { barreaux: 'sans', dim: /50x50/.test(v.rempl) ? '50x50' : (/20x20/.test(v.rempl) ? '20x20' : '200x50'), pli: true };   // 07/11/2026 (Gonçalo): maille 200x50 = «avec pli» por defeito
@@ -4893,7 +4948,7 @@ function renderEditor() {
   const radio = (name, opts, cur, desel) => `<div class="opts">${opts.map(o => { const [val, lab, dis] = optVal(o); return `<label class="opt"><input type="radio" name="${name}" value="${esc(val)}" ${desel ? 'data-desel="1"' : ''} ${String(cur) === String(val) ? 'checked' : ''} ${dis ? 'disabled' : ''}><span>${esc(t(lab))}</span></label>`; }).join('')}</div>`;
   // uma só opção e obrigatória: escolhe-se sozinha e o passo não aparece (menos um clique)
   const only = (key, opts) => { const en = opts.map(optVal).filter(o => !o[2] && String(o[0]) !== ''); if (en.length === 1) { if (v[key] !== en[0][0]) { v[key] = en[0][0]; editing.auto = true; } return true; } return false; };
-  const step = (lab, key, opts, cur) => only(key, opts) ? '' : `<div class="f"><span class="lab req">${t(lab)}</span>${radio('e_' + key, opts, cur)}</div>`;
+  const step = (lab, key, opts, cur) => only(key, opts) ? '' : `<div class="f"><span class="lab req">${t(lab)}</span>${radio('e_' + key, opts, cur, key !== 'type')}</div>`;
   const typeStep = PIECES_ON && INTERNE;   // «Type de produit»: Complet / Pièces / parties (Matériau à esquerda, Type ao centro, Fiche à direita)
   const pieces = typeStep && v.type === 'pieces';
   if (pieces) {   // 05/11/2026 (Gonçalo): em Peças a Fiche (Industriel / Habitat) continua a escolher-se: decide o ARC; Alu Habitat precisa ainda da gama
@@ -4972,8 +5027,8 @@ function renderEditor() {
       const cls = 'f' + (errMsg ? ' has-err' : '') + (wK.get(f.k) ? ' has-wrn' : '') + ((['radio', 'qty', 'textarea', 'info'].includes(f.type) || f.wide) ? ' full' : '') + (f.type === 'check' ? ' ckcard' + (val ? ' on' : '') : '');
       h += `<div class="${cls}" data-k="${f.k}">`;
       const lab = f.label ? `<span class="lab ${f.req ? 'req' : ''}">${esc(t(f.label))}</span>` : '';
-      if (f.type === 'radio') h += lab + radio('f_' + f.k, f.opts, val, f.deselect);
-      else if (f.type === 'select') h += `<label class="${f.req ? 'req' : ''}" for="f_${f.k}">${esc(t(f.label))}</label><select id="f_${f.k}" name="f_${f.k}">${f.opts.some(o => String(optVal(o)[0]) === '') ? '' : '<option value=""></option>'}${f.opts.map(o => { const [ov, ol, dis] = optVal(o); return `<option value="${esc(ov)}" ${String(val) === String(ov) ? 'selected' : ''} ${dis ? 'disabled' : ''}>${esc(t(ol))}${dis ? ' ' + t('(non disponible)') : ''}</option>`; }).join('')}</select>`;
+      if (f.type === 'radio') h += lab + radio('f_' + f.k, f.opts, val, !f.nodeselect && !NODESEL.has(f.k) && !(f.opts && f.opts.length === 1));   // 12/11/2026 (Gonçalo): todas as escolhas únicas se podem desselecionar (a validação volta a avisar nos obrigatórios; a cruz sai do PDF)
+      else if (f.type === 'select') h += `<label class="${f.req ? 'req' : ''}" for="f_${f.k}">${esc(t(f.label))}</label><select id="f_${f.k}" name="f_${f.k}">${f.opts.some(o => String(optVal(o)[0]) === '') ? '' : '<option value=""></option>'}${sortRal(f.opts).map(o => { const [ov, ol, dis] = optVal(o); return `<option value="${esc(ov)}" ${String(val) === String(ov) ? 'selected' : ''} ${dis ? 'disabled' : ''}>${esc(t(ol))}${dis ? ' ' + t('(non disponible)') : ''}</option>`; }).join('')}</select>`;
       else if (f.type === 'number') h += `<label class="${f.req ? 'req' : ''}" for="f_${f.k}">${esc(t(f.label))}</label><div class="unit"><input type="number" id="f_${f.k}" name="f_${f.k}" min="${f.k === 'qt' || /^pot(Rec|Gui)Qt$/.test(f.k) ? f.min || 1 : 0}" max="99999" oninput="if (this.value.replace(/\D/g, '').length > 5) this.value = this.value.slice(0, this.value.length - 1)" ${f.dec ? 'step="0.1" inputmode="decimal"' : 'inputmode="numeric"'} value="${esc(val == null ? '' : val)}">${f.unit ? `<em>${f.unit}</em>` : ''}</div>${f.soft ? `<span class="hint">${esc(tf('Gamme du configurateur : {min} à {max} mm. Au-delà : à étudier par Ferplay.', { min: fmt(f.min), max: fmt(f.max) }))}</span>` : ''}`;
       else if (f.type === 'text') h += `<label class="${f.req ? 'req' : ''}" for="f_${f.k}">${esc(t(f.label))}</label><input type="text" id="f_${f.k}" name="f_${f.k}" value="${esc(val || '')}">`;
       else if (f.type === 'textarea') h += `<label for="f_${f.k}">${esc(t(f.label))}</label><textarea id="f_${f.k}" name="f_${f.k}">${esc(val || '')}</textarea>`;
@@ -4994,13 +5049,33 @@ function renderEditor() {
   } else { $('edStatus').innerHTML = ''; renderErrSide([]); }
   const keepFocus = document.activeElement && document.activeElement.id;
   $('edBody').innerHTML = h;
+  taEnhance($('edBody'));
   if (keepFocus && $(keepFocus)) $(keepFocus).focus();
   if (editing.auto) { editing.auto = false; save(); }
+}
+// 12/11/2026 (Gonçalo): listas longas (modelos, RAL…): campo para escrever e filtrar («D» mostra o que começa por D); a lista passa a mostrar só o que corresponde
+function taEnhance(root) {
+  root.querySelectorAll('select').forEach(sel => {
+    if (sel.options.length < 12 || sel.dataset.ta) return; sel.dataset.ta = '1';
+    const all = [...sel.options].map(o => ({ v: o.value, l: o.textContent, d: o.disabled }));
+    const inp = document.createElement('input'); inp.type = 'search'; inp.className = 'ta'; inp.autocomplete = 'off';
+    inp.placeholder = t('Écrire pour filtrer la liste…'); inp.setAttribute('aria-label', t('Écrire pour filtrer la liste…'));
+    sel.parentNode.insertBefore(inp, sel);
+    const norm = x => String(x).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const hits = () => { const q = norm(inp.value.trim()); return !q ? all : all.filter(o => { const l = norm(o.l); return l.startsWith(q) || l.split(/[\s–\-\/(),.]+/).some(w => w.startsWith(q)) || (q.length > 1 && l.includes(q)); }); };
+    inp.addEventListener('input', e => {
+      e.stopPropagation(); const cur = sel.value, h = hits(), q = inp.value.trim();
+      sel.innerHTML = h.map(o => `<option value="${esc(o.v)}" ${o.d ? 'disabled' : ''}>${esc(o.l)}</option>`).join('');
+      sel.size = q ? Math.min(8, Math.max(2, h.length)) : 1;
+      sel.value = h.some(o => o.v === cur) ? cur : (q ? '' : cur); if (q && !h.some(o => o.v === cur)) sel.selectedIndex = -1;
+    });
+    inp.addEventListener('keydown', e => { if (e.key !== 'Enter') return; e.preventDefault(); const f = [...sel.options].find(o => o.value !== '' && !o.disabled); if (f) { sel.value = f.value; sel.dispatchEvent(new Event('change', { bubbles: true })); } });
+  });
 }
 function editorChange(e) {
   const t = e.target; if (!editing) return;
   const v = editing.v;
-  if (t.dataset.qty) { const qk = t.dataset.qk || 'm_acc'; v.f[qk] = v.f[qk] || {}; v.f[qk][t.dataset.qty] = Number(t.value) || 0; save(); return; }
+  if (t.dataset.qty) { const qk = t.dataset.qk || 'm_acc'; v.f[qk] = v.f[qk] || {}; v.f[qk][t.dataset.qty] = Number(t.value) || 0; save(); updateEditorStatusOnly(); renderStatus(); return; }   // 12/11/2026: basta uma linha com quantidade (qualquer subconjunto); o aviso atualiza-se logo
   const n = t.name || t.id; if (!n) return;
   if (n === 'e_type') {   // 05/11/2026: Complet / Pièces — mudar de tipo recomeça as respostas do produto
     const keepFiche = v.fiche && v.fiche !== 'pieces' ? v.fiche : (t.value === 'complet' ? 'industriel' : null);   // 05/11/2026: a Fiche escolhida mantém-se ao mudar de Complet para Peças (e vice-versa)
@@ -5077,7 +5152,16 @@ function gotoMissing() {
 document.addEventListener('mousedown', e => { const l = e.target.closest && (e.target.closest('input[data-desel]') || (e.target.closest('label.opt') || {}).querySelector && e.target.closest('label.opt').querySelector('input[data-desel]')); if (l) l.dataset.was = l.checked ? '1' : ''; });
 document.addEventListener('click', e => {
   const rd = e.target.closest && e.target.closest('input[type=radio][data-desel]');
-  if (rd && e.target === rd && rd.dataset.was === '1' && typeof editing !== 'undefined' && editing) { rd.checked = false; rd.dataset.was = ''; delete editing.v.f[rd.name.slice(2)]; renderEditor(); renderStatus(); save(); return; }
+  if (rd && e.target === rd && rd.dataset.was === '1') {
+    // 12/11/2026 (Gonçalo): clicar outra vez na opção marcada desseleciona-a (estado vazio: o campo obrigatório volta a avisar e a cruz sai do PDF)
+    if (/^c_/.test(rd.name)) { rd.checked = false; rd.dataset.was = ''; document.getElementById('secClient').dispatchEvent(new Event('change', { bubbles: true })); return; }
+    if (typeof editing !== 'undefined' && editing) {
+      rd.checked = false; rd.dataset.was = '';
+      if (/^e_/.test(rd.name)) { const order = ['mat', 'fiche', 'gamme', 'kind', 'groupe', 'code']; const k = rd.name.slice(2); for (const x of order.slice(order.indexOf(k))) delete editing.v[x]; editing.v.f = {}; editing.v.indef = false; }
+      else delete editing.v.f[rd.name.slice(2)];
+      renderEditor(); renderStatus(); save(); return;
+    }
+  }
   if (e.target.closest('[data-savebtn]')) { e.preventDefault(); $('btnSave').click(); return; }
   if (e.target.closest('#pdfFloat')) { e.preventDefault(); $('secSend').scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
   const g = e.target.closest('[data-goto]'); if (g) { e.preventDefault(); focusField(g.dataset.goto); }
