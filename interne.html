@@ -5884,6 +5884,8 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
     label = segs[segs.length - 1] || ''; gamme = segs[3] || '';
     cands = Object.entries(CAT).filter(([, m]) => m.hab && nz(m.label) === nz(label) && (!kind || m.kind === kind) && (!gamme || nz(m.gammeNom || '') === nz(gamme) || true));
     if (cands.length > 1 && gamme) { const g = cands.filter(([, m]) => nz(m.gammeNom || '') === nz(gamme)); if (g.length) cands = g; }
+    // 13/11/2026 (Gonçalo): «A8 2 Vantaux», «A30.B 2 Vantaux» = modelo A8 / A30.B em battant (ligação segura: nome exato do catálogo + o sufixo «N vantaux»)
+    if (!cands.length) { const vm = label.match(/^(.+?)\s+[12]\s+vantaux?$/i); if (vm && (!kind || kind === 'battant')) { const c2 = Object.entries(CAT).filter(([, m]) => m.hab && nz(m.label) === nz(vm[1]) && m.kind === 'battant'); if (c2.length) { cands = c2; label = vm[1]; kind = 'battant'; } } }
     if (!cands.length) cands = Object.entries(CAT).filter(([, m]) => m.hab && (nz(m.groupeNom || '') === nz(segs[segs.length - 2] || '')) && (!kind || m.kind === kind));
     return { code: cands.length ? cands[0][0] : '', label, kind, tried: cands.length };
   }
@@ -5945,6 +5947,7 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
     return s;
   }
   function fillProduct(code, prod) {
+    const BASE = !!prod.__base;   // variante-base de um modelo «à définir»: só se lê o que o devis diz, nunca defaults do modelo
     window.__IMP = true;   // o formulário não pré-seleciona o standard enquanto se lê o devis
     const m = CAT[code]; const v = { qt: '1' }; const used = new Set(); const log = []; const extraUsed = new Set();
     // 11/11/2026 (Gonçalo): dois sentidos no mesmo produto («1x Ouverture à droite 1x ouverture à gauche»): sens fica por preencher e o texto vai para as Observations do produto
@@ -6033,13 +6036,13 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
     { const tp = prod.pairs.find(p => /^trappe de visite$/.test(nz(p.key))); if (tp && v.trappe !== undefined && v.trappe === v.trappeAuto) { const tt = nz(tp.val), val = /^oui/.test(tt) ? 'Oui' : (/^non/.test(tt) ? 'Non' : ''); if (val && val !== v.trappe) { v.trappe = val; if (v.trappeAuto !== undefined && val === 'Non') v.trappeAuto = v.trappeAuto; log.push({ field: 'trappe', value: val, src: tp.key + ' : ' + tp.val }); } } }
     // 12/11/2026 (Gonçalo): pose e fixation (Habitat): o que o devis diz é lido; se é silencioso assume-se o standard, marcado «standard (assumido)»
     if (m.hab && typeof habPoses === 'function' && habPoses(m).length) {
-      if (!v.pose) { const sp = habStdPose(m); if (sp) setv('pose', String(sp.id), 'standard (assumido)'); }
+      if (!v.pose && !BASE) { const sp = habStdPose(m); if (sp) setv('pose', String(sp.id), 'standard (assumido)'); }
       const pp = habPose(m, v);
       if (pp && pp.fixations.length && !v.fix) {
         const ff = fieldsFor(m, v).find(f => f.k === 'fix'), fp = ff && prod.pairs.find(p => /^(type de )?fixation/.test(nz(p.key)) && !used.has(p) && !/poteaux?/.test(nz(p.key)));
         const rr = fp && resolve(ff, fp);
         if (rr) { used.add(fp); setv('fix', rr.val, fp.key + ' : ' + fp.val); }
-        else { const sf = habStdFix(pp); if (sf) setv('fix', String(sf.id), 'standard (assumido)'); }
+        else if (!BASE) { const sf = habStdFix(pp); if (sf) setv('fix', String(sf.id), 'standard (assumido)'); }
       }
     }
     window.__IMP = false;
@@ -6070,7 +6073,7 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
         if (pourAuto && has('motorisable')) setv('ouv', 'motorisable', pourAuto);
         else if (sansS && has('motorisable') && !has('manuel') && !m.hab) setv('ouv', 'motorisable', sansS + ' (défaut : sans serrure = motorisable)');
         else if (avecS && has('manuel')) setv('ouv', 'manuel', avecS + ' (défaut : avec serrure = manuel)');
-        else if (!has('manuel') && has('motorisable') && !find(/motorise\b/)) { if (!m.hab) setv('ouv', 'motorisable', 'défaut : modèle sans serrure, mode non indiqué = motorisable'); else { const ph = find(/motoris/); if (ph) habLeft.push(ph + ' (type d’ouverture non indiqué : à préciser)'); } }
+        else if (!BASE && !has('manuel') && has('motorisable') && !find(/motorise\b/)) { if (!m.hab) setv('ouv', 'motorisable', 'défaut : modèle sans serrure, mode non indiqué = motorisable'); else { const ph = find(/motoris/); if (ph) habLeft.push(ph + ' (type d’ouverture non indiqué : à préciser)'); } }
       }
       const F6 = fieldsFor(m, v);
       if (sansS && F6.some(f => f.k === 'serPort') && !v.serPort) setv('serPort', 'sans', sansS);
@@ -6078,7 +6081,7 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
       if (sansS) extraUsed.add(sansS); if (pourAuto && v.ouv === 'motorisable') extraUsed.add(pourAuto);
     }
     // 07/11/2026: o A49 battant passou a poder ser motorisable / motorisé, mas o Chiffreur só o dá manual: sem «Type d'ouverture» no devis = manual (como antes)
-    if (!v.ouv && /^INSMVAA4/.test(m.code) && m.ouv && m.ouv.length > 1) setv('ouv', 'manuel', 'défaut : A49 manuel');
+    if (!BASE && !v.ouv && /^INSMVAA4/.test(m.code) && m.ouv && m.ouv.length > 1) setv('ouv', 'manuel', 'défaut : A49 manuel');
     // 05/11/2026: sem menção à fechadura no devis: motorizado / motorizável = sem fechadura; manual = com fechadura (para não bloquear; a Sónia pode alterar)
     { const ov = String(v.ouv || (m.kind === 'portillon' ? 'manuel' : '')), motor = /motoris/i.test(ov), manual = /manuel/i.test(ov), F2 = fieldsFor(m, v);
       if (motor || manual) {
@@ -6134,24 +6137,69 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
       cands = Object.values(CAT).filter(m => !m.hab && !m.alu && !m.pieces && m.kind === kind);
       cands.sort((a, b) => ({ sm: 0, st: 1, co: 2 }[a.gamme] ?? 9) - ({ sm: 0, st: 1, co: 2 }[b.gamme] ?? 9));
     }
-    return cands.length ? { code: cands[0].code, nome: nome.toUpperCase() } : null;
+    return cands.length ? { code: pickBase(cands, prod), nome: nome.toUpperCase() } : null;
+  }
+  // 13/11/2026 (Gonçalo): variante-base (só para as regras) de um modelo que o catálogo não tem: mesma família e tipo; o nome real fica no devis / observações («modèle à définir»)
+  // a variante-base é só um «contentor» de campos: escolhe-se, entre as do mesmo tipo e família, a que consegue guardar mais campos lidos do devis (nunca o modelo)
+  function pickBase(c, prod) {
+    if (!c.length) return '';
+    if (!prod || c.length < 2) return c[0].code;
+    let best = c[0], bs = -1e9;
+    const prev = prod.__base; prod.__base = true;
+    for (const m of c.slice(0, 60)) { let sc; try { const r = fillProduct(m.code, prod); sc = r.log.length * 10 - r.left.length; } catch (e) { continue; } if (sc > bs) { bs = sc; best = m; } }
+    prod.__base = prev;
+    return best.code;
+  }
+  function baseVariant(kind, mat, hab, prod) {
+    if (!kind) return '';
+    let c;
+    if (hab) { c = Object.values(CAT).filter(m => m.hab && m.mat === mat && m.kind === kind && !m.catalogueOnly); c.sort((a, b) => (/FLUVIALE/.test(b.gammeNom || '') ? 1 : 0) - (/FLUVIALE/.test(a.gammeNom || '') ? 1 : 0)); }
+    else if (mat === 'alu') c = Object.values(CAT).filter(m => m.alu && !m.hab && !m.pieces && m.kind === kind);
+    else { c = Object.values(CAT).filter(m => !m.hab && !m.alu && !m.pieces && m.kind === kind); c.sort((a, b) => ({ sm: 0, st: 1, co: 2 }[a.gamme] ?? 9) - ({ sm: 0, st: 1, co: 2 }[b.gamme] ?? 9)); }
+    return pickBase(c, prod);
+  }
+  // 13/11/2026 (Gonçalo): quando o modelo não é reconhecido («à définir» ou sem modelo) o texto do devis (designação do modelo) fica preservado e visível nas Observações do produto
+  function preserveDesignations(res) {
+    const ocr = !!(res && res.devis && res.devis.ocr), add = (p, t) => { p.v = p.v || {}; p.v.obs = [p.v.obs, t].filter(Boolean).join('\n'); };
+    for (const p of (res && res.products) || []) {
+      if (p.indef && p.code) {   // «à définir»: o que o devis diz e a variante-base não guarda vai para as Observações (nada se perde)
+        try {
+          const ks = new Set(fieldsFor(CAT[p.code], p.v).map(f => f.k)), lost = [];
+          for (const l of p.log || []) if (!ks.has(l.field) || p.v[l.field] === undefined || p.v[l.field] === '') lost.push(String(l.src || (l.field + ' = ' + l.value)).slice(0, 90));
+          for (const x of p.left || []) lost.push(String(x).slice(0, 90));
+          const u = [...new Set(lost)].slice(0, 12);
+          if (u.length && ks.has('obs') && !String(p.v.obs || '').includes('Lu dans le devis')) { add(p, 'Lu dans le devis (sans champ dans le formulaire) : ' + u.join(' ; ')); p.lostKept = u.length; }
+        } catch (e) { }
+      }
+      const nameLost = !p.code || (p.indef && (!p.modeleNom || /^[àa] d[ée]finir$/i.test(p.modeleNom)));
+      if (!nameLost) continue;
+      const des = String(p.designation || p.head || '').replace(/^(Industriel|Habitat)\s*[·>\-–]\s*/i, '').replace(/\s+/g, ' ').trim().slice(0, 220);
+      if (!des) continue;
+      const line = 'Modèle indiqué dans le devis : ' + des + (ocr ? ' (lu par OCR, confirmer)' : '');
+      if (p.code) { let ok = false; try { ok = fieldsFor(CAT[p.code], p.v).some(f => f.k === 'obs'); } catch (e) { } if (!ok) continue; }
+      if (String((p.v || {}).obs || '').includes('Modèle indiqué dans le devis')) continue;
+      add(p, line); p.designationKept = true;
+    }
+    return res;
   }
   function finishProd(prod, mm) {
     mm = mm || findModel(prod);
     let indef = false, modeleNom = '';
     if (!mm.code) { const fb = fallbackModel(prod, mm); if (fb) { mm = Object.assign({}, mm, { code: fb.code }); indef = true; modeleNom = fb.nome; } }
+    prod.__base = !!(indef || mm.base);
     let r; try { r = mm.code ? fillProduct(mm.code, prod) : { v: {}, log: [], left: prod.pairs.map(p => p.key + ' : ' + p.val), optMatches: [] }; } finally { window.__IMP = false; }
     const m = mm.code ? CAT[mm.code] : null;
     const errs = m ? validateProduct(m, r.v).errors : [];
     return { head: prod.head, kindLine: prod.kindLine, model: mm, code: mm.code, indef, modeleNom, mat: m && m.mat, fiche: m && m.fiche, v: r.v, log: r.log, left: r.left, missing: errs.map(e => e.ui || e.msg), raw: prod.raw };
   }
-  async function analyse(file) {
+  async function analyse(file) { return preserveDesignations(await analyse0(file)); }
+  async function analyse0(file) {
     const lines = await readLines(file);
     // PDF digitalizado (sem texto): não se tenta OCR
     if (!lines.length) return { devis: { scanned: true, isChiffreur: false, products: [] }, products: [], lines };
     const d = parseDevis(lines);
     // encomendas de outros clientes: perfis por cliente (pdf_profiles.js)
-    if (!d.isChiffreur && window.PdfProfiles) { const pr = window.PdfProfiles.analyse(lines, { findModel, fillProduct, parseBlock, finishProd, nz, toks }); if (pr) { if (lines.some(l => l.ocr)) { pr.devis.ocr = true; (pr.products || []).forEach(p => { p.notes = (p.notes || []).concat([T('Lu par OCR : confirmez chaque valeur (surtout les mesures)')]); }); } return pr; } }
+    if (!d.isChiffreur && window.PdfProfiles) { const pr = window.PdfProfiles.analyse(lines, { findModel, fillProduct, parseBlock, finishProd, nz, toks, baseVariant }); if (pr) { if (lines.some(l => l.ocr)) { pr.devis.ocr = true; (pr.products || []).forEach(p => { p.notes = (p.notes || []).concat([T('Lu par OCR : confirmez chaque valeur (surtout les mesures)')]); }); } return pr; } }
     // 05/11/2026 (Gonçalo): há PDFs com o cabeçalho de outro logótipo/formato mas o corpo igual ao do Chiffreur: lê-se sempre, nunca se bloqueia
     if (!d.isChiffreur && d.products.length) { d.isChiffreur = true; d.genericChiffreur = true; if (!d.societe && !d.client) { const iv = lines.findIndex(l => /Soci[ée]t[ée]\s*:/i.test(l.text)); if (iv >= 0) d.societe = lines[iv].text.replace(/^.*Soci[ée]t[ée]\s*:\s*/i, '').trim(); } }
     // 12/11/2026 (Gonçalo): nunca bloquear por faltar «DEVIS : …»: se nenhum perfil nem o analisador do Chiffreur reconheceu produtos, lê-se pelo menos o cliente / nº de devis / contactos de forma genérica
@@ -6189,7 +6237,7 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
     }).join('');
     // formulário já com outro cliente: as coordonnées só se preenchem se estiverem vazias
     let warn = ''; try { const cur = readClient(); const ns = d.societe || d.client; if (cur.societe && ns && nz(cur.societe) !== nz(ns)) warn = '<div class="alert">' + E(T('Le formulaire contient déjà un autre client')) + ' (' + E(cur.societe) + ') : ' + E(T('ses coordonnées ne sont pas remplacées. Utilisez « Recommencer » pour une nouvelle demande.')) + '</div>'; } catch (e) { }
-    const none = !res.products.length ? '<div class="alert">' + E(T('Aucun produit n’a pu être lu automatiquement dans ce PDF (format non reconnu). Ce qui a été lu (client, références) est ci-dessus : vérifiez-le, puis ajoutez les produits à la main.')) + '</div>' : '';
+    const none = !res.products.length ? '<div class="alert">' + E(T('Aucun produit n’a pu être lu automatiquement dans ce PDF (format non reconnu). Ce qui a été lu (client, références) est ci-dessus : vérifiez-le, puis ajoutez les produits à la main.')) + '</div>' : '';
     const ocrW = d.ocr ? '<div class="alert">' + E(T('Document digitalisé lu par OCR : le texte peut contenir des erreurs. Confirmez chaque valeur (surtout les mesures) avant de générer l’ARC.')) + '</div>' : '';
     box.innerHTML = head + warn + ocrW + none + cards + `<div class="row"><button type="button" id="pdfApply" class="primary">${E(T('Appliquer au formulaire'))}</button><button type="button" id="pdfClose">${E(T('Fermer'))}</button></div><p class="hint">${E(T('Rien n’est envoyé : le PDF est lu sur cet ordinateur. Les prix n’entrent jamais. Vérifiez toujours chaque produit avant de générer l’ARC.'))}</p>`;
     box.hidden = false;
@@ -6260,7 +6308,7 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
       try { render(await analyse(f)); } catch (err) { box.innerHTML = '<div class="alert">' + E(T('Impossible de lire le PDF')) + ' : ' + E(err.message) + '</div>'; }
     });
   }
-  window.PdfImport = { readLines, parseDevis, parseBlock, findModel, fillProduct, finishProd, analyse, apply, initUI, nz, toks };
+  window.PdfImport = { readLines, parseDevis, parseBlock, findModel, fillProduct, finishProd, baseVariant, preserveDesignations, analyse, apply, initUI, nz, toks };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => initUI()); else initUI();
 })();
 </script>
@@ -6341,7 +6389,9 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
     else if (spec.potSec) flags.push('Poteaux ' + spec.potSec + 'x' + spec.potSec);
     const kindLine = spec.kindLine || ({ battant: 'Portail 2 Vantaux', coulissant: 'Portail Coulissant', autoportant: 'Portail autoportant', portillon: 'Portillon', cloture: 'Clôture' }[spec.kind] || '');
     const prod = { head: spec.head || spec.label || '', kindLine, pairs, flags, bullets, options, raw: spec.raw || '' };
-    const mm = resolve(spec);
+    let mm = resolve(spec), baseIndef = false;
+    // 13/11/2026 (Gonçalo): modelo que o catálogo não tem (Canisse, Fluviale Alu, AZ5…): produto «modèle à définir» com uma variante-base do mesmo tipo e família; o nome do devis fica nas Observações
+    if (!mm.code && I.baseVariant && spec.kind) { const bv = I.baseVariant(spec.kind, spec.mat || 'fer', !!spec.hab, prod); if (bv) { mm = Object.assign({}, mm, { code: bv, base: true }); baseIndef = true; } }
     let ap;
     if (mm.code) {
       ap = I.finishProd(prod, mm);
@@ -6381,6 +6431,8 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
       ap = { head: prod.head, kindLine, model: mm, code: '', mat: spec.mat || 'fer', fiche: spec.hab ? 'habitat' : 'industriel', v, log, left: [], missing: [], raw: prod.raw, partial: { mat: spec.mat || 'fer', fiche: spec.hab ? 'habitat' : 'industriel', kind: spec.kind } };
       ap.left = (spec.left || []).slice();
     }
+    ap.designation = spec.head || spec.label || prod.head || '';
+    if (baseIndef) { ap.indef = true; ap.modeleNom = mm.label ? String(mm.label).toUpperCase() : 'À DÉFINIR'; }
     ap.notes = (spec.notes || []).concat(spec.ouvNote ? [spec.ouvNote] : [], notes || []);
     if (spec.left && mm.code) ap.left = ap.left.concat(spec.left);
     ap.head = spec.title || ap.head;
@@ -6564,6 +6616,7 @@ if (!PROD && INTERNE && location.hash.startsWith('#demo')) { exemple(); startEdi
         });
         const prod = I.parseBlock(lines);
         const pr = I.finishProd(prod, mm || undefined);
+        pr.designation = head;
         if (pr.v && qt > 1) pr.v.qt = String(qt);
         pr.head = (isHab ? 'Habitat' : 'Industriel') + ' · ' + head.slice(0, 80);
         products.push(pr);
