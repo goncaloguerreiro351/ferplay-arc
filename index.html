@@ -13,15 +13,9 @@
   --ok: #1d7a45; --ok-soft: #e3f4e9; --bad: #b3261e; --bad-soft: #fbe9e7; --warn: #9a5800; --warn-soft: #fff1dc;
   --font: "Avenir Next LT Pro", "Avenir Next", Avenir, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
   --r: 10px;
+  --field: #ffffff; --field-line: #b9adb6;
+  color-scheme: light;
 }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-  --bg: #1b1619; --surface: #241d22; --fg: #f1e9ee; --muted: #b3a6af; --line: #3a3037;
-  --accent: #e45cb0; --accent-deep: #f08ccb; --accent-soft: #3a2232;
-  --ok: #6fd39a; --ok-soft: #173a26; --bad: #ff8a80; --bad-soft: #3d1c1a; --warn: #f2c94c; --warn-soft: #3a3014; color-scheme: dark } }
-:root[data-theme="dark"] {
-  --bg: #1b1619; --surface: #241d22; --fg: #f1e9ee; --muted: #b3a6af; --line: #3a3037;
-  --accent: #e45cb0; --accent-deep: #f08ccb; --accent-soft: #3a2232;
-  --ok: #6fd39a; --ok-soft: #173a26; --bad: #ff8a80; --bad-soft: #3d1c1a; --warn: #f2c94c; --warn-soft: #3a3014; color-scheme: dark }
 * { box-sizing: border-box }
 [hidden] { display: none !important }
 body { background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 15px; line-height: 1.45; margin: 0 }
@@ -33,7 +27,7 @@ header.top p { margin: 2px 0 0; color: var(--muted); font-size: 14px }
 .status { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); padding-block: 8px }
 .status .bar { display: flex; align-items: center; gap: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 10px 14px; flex-wrap: wrap }
 .chip { font-weight: 700; font-size: 13px; padding: 4px 10px; border-radius: 99px; white-space: nowrap }
-.chip.bad { background: var(--bad-soft); color: var(--bad) } .chip.ok { background: var(--ok-soft); color: var(--ok) } .chip.warn { background: var(--warn-soft); color: var(--warn) }
+.chip.info { background: var(--accent-soft); color: var(--accent-deep) } .chip.bad { background: var(--bad-soft); color: var(--bad) } .chip.ok { background: var(--ok-soft); color: var(--ok) } .chip.warn { background: var(--warn-soft); color: var(--warn) }
 .status .txt { flex: 1; min-width: 0; color: var(--muted); font-size: 13.5px }
 .banner { border-radius: var(--r); padding: 10px 14px; font-size: 14px; margin-block: 8px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap }
 .banner span { flex: 1; min-width: 200px } .banner.proto { background: var(--warn-soft); color: var(--warn) } .banner.resume { background: var(--accent-soft); color: var(--accent-deep) }
@@ -48,15 +42,18 @@ section.card > h2 small { font-size: 12.5px; color: var(--muted); font-weight: 4
 .hint { font-size: 12.5px; color: var(--muted) }
 .full { grid-column: 1 / -1 }
 input[type=text], input[type=email], input[type=tel], input[type=number], select, textarea {
-  font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; width: 100%; min-width: 0 }
-input[readonly] { color: var(--muted) }
+  font: inherit; color: var(--fg); background: var(--field); border: 1px solid var(--field-line); border-radius: 8px; padding: 9px 10px; width: 100%; min-width: 0 }
+input:hover:not([readonly]):not(:disabled), select:hover:not(:disabled), textarea:hover:not(:disabled) { border-color: var(--muted) }
+input[readonly], input:disabled, select:disabled, textarea:disabled { color: var(--muted); background: var(--bg); border-color: var(--line) }
 textarea { min-height: 80px; resize: vertical }
 input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, .opt input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px }
 .unit { display: flex; align-items: center; gap: 6px } .unit input { flex: 1 } .unit em { font-style: normal; color: var(--muted); font-size: 13px }
 .opts { display: flex; flex-wrap: wrap; gap: 8px }
 .opt { position: relative } .opt input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer }
-.opt span { display: inline-block; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); font-size: 14px; cursor: pointer; user-select: none }
-.opt input:checked + span { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-deep); font-weight: 600 }
+.opt span { display: inline-block; padding: 8px 12px; border: 1px solid var(--field-line); border-radius: 8px; background: var(--surface); font-size: 14px; cursor: pointer; user-select: none }
+.opt:hover input:not(:disabled):not(:checked) + span { border-color: var(--accent) }
+.opt input:checked + span { border-color: var(--accent); background: var(--accent); color: #fff; font-weight: 600 }
+.opt input:checked + span::before { content: "\2713"; margin-right: 6px }
 .opt input:disabled + span { opacity: .45; cursor: not-allowed }
 .ck { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; cursor: pointer } .ck input { margin-top: 3px; accent-color: var(--accent); width: 16px; height: 16px; flex: none }
 .checks { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px 14px }
@@ -92,6 +89,15 @@ button.link { border: 0; background: none; color: var(--accent-deep); text-decor
 .f.ckcard .ck { font-weight: 600; font-size: 14px }
 .goto { border: 0; background: none; color: inherit; text-decoration: underline; padding: 0 2px; font: inherit; cursor: pointer }
 #btnGoto { margin-left: auto }
+/* 14/11/2026: indicador de passos 1 · 2 · 3 na barra de estado */
+.steps3 { display: flex; align-items: center; gap: 4px; list-style: none; margin: 0; padding: 0 }
+.steps3 button { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; padding: 2px 6px 2px 2px; border-radius: 99px; font: inherit; font-size: 13px; color: var(--muted); cursor: pointer; min-height: 0 }
+.steps3 .n { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--field-line); font-size: 12px; font-weight: 700; background: var(--surface); color: var(--muted) }
+.steps3 .cur .n { border-color: var(--accent); background: var(--accent); color: #fff } .steps3 .cur { color: var(--fg); font-weight: 600 }
+.steps3 .done .n { border-color: var(--ok); background: var(--ok); color: #fff } .steps3 .done { color: var(--ok) }
+@media (max-width: 600px) { .chip.info { display: none } #btnClear { margin-left: auto; font-size: 12px } #btnGoto { margin-left: 0; padding: 6px 10px; font-size: 13px; min-height: 34px } .status .bar { gap: 4px 10px } }
+.steps3 li + li::before { content: ""; display: inline-block; width: 10px; height: 1.5px; background: var(--line); margin-right: 4px; vertical-align: middle }
+@media (max-width: 600px) { .steps3 .lbl { display: none } .steps3 button { padding: 0 } .steps3 li + li::before { width: 6px; margin-right: 2px } }
 .steps { display: grid; gap: 12px; counter-reset: st }
 .step { display: grid; grid-template-columns: 34px 1fr; gap: 12px; align-items: start }
 .step::before { counter-increment: st; content: counter(st); width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: var(--on-accent); display: grid; place-items: center; font-weight: 700 }
@@ -130,8 +136,6 @@ input.ta{width:100%;margin-bottom:4px;font-size:13px}
 @media (max-width: 760px) { #errSide { max-width: calc(100vw - 24px); bottom: 70px } }
 /* 13/11/2026 (auditoria, lote A): texto sobre a cor de marca legível em modo escuro (M7); cores do «a confirmar» por variável */
 :root { --on-accent: #fff; --need: #e8a317; --need-bg: #fff8e1; --need-fg: #a36a00 }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --on-accent: #1b1619; --need: #f2c94c; --need-bg: #3a3014; --need-fg: #f2c94c } }
-:root[data-theme="dark"] { --on-accent: #1b1619; --need: #f2c94c; --need-bg: #3a3014; --need-fg: #f2c94c }
 .hint.long { color: var(--warn); font-weight: 600 }
 .pdet summary { cursor: pointer; font-size: 13px; color: var(--accent-deep); padding-block: 4px; width: fit-content }
 .pdet-s { font-size: 13px; margin-top: 6px } .pdet-s b { display: block } .pdet-s div { color: var(--muted); overflow-wrap: anywhere }
@@ -216,6 +220,11 @@ viewBox="0 0 17206.5 4581.43"
   </div>
 
   <div class="status"><div class="bar">
+    <ol class="steps3" id="steps3" aria-label="Étapes">
+      <li><button type="button" data-step="secClient"><span class="n">1</span><span class="lbl">Coordonnées</span></button></li>
+      <li><button type="button" data-step="secProducts"><span class="n">2</span><span class="lbl">Produits</span></button></li>
+      <li><button type="button" data-step="secSend"><span class="n">3</span><span class="lbl">Envoi</span></button></li>
+    </ol>
     <span class="chip bad" id="chip" role="status">Incomplet</span>
     <span class="txt" id="statusTxt" aria-live="polite"></span>
     <button type="button" class="primary" id="btnGoto" hidden>Aller au champ manquant</button>
@@ -2058,6 +2067,12 @@ const I18N_SRC = {
   'Reprendre': ['Retomar', 'Resume'],
   'Recommencer': ['Recomeçar', 'Start over'],
   'Incomplet': ['Incompleto', 'Incomplete'],
+  'À remplir': ['Por preencher', 'To fill in'],
+  'Commencez par vos coordonnées, puis ajoutez vos produits.': ['Comece pelos seus dados e depois adicione os produtos.', 'Start with your details, then add your products.'],
+  'Étapes': ['Passos', 'Steps'],
+  'Envoi': ['Envio', 'Sending'],
+  'Produits': ['Produtos', 'Products'],
+  'Coordonnées': ['Dados', 'Details'],
   'Aller au champ manquant': ['Ir para o campo em falta', 'Go to missing field'],
   'Effacer mes données': ['Apagar os meus dados', 'Clear my data'],
   'Tout effacer ?': ['Apagar tudo?', 'Clear everything?'],
@@ -5106,6 +5121,7 @@ function clientErrors(c) {
   return e;
 }
 let clientTouched = false;
+let tentou = false;   // 14/11/2026: o estado só fica a vermelho depois de o cliente tentar avançar (ou de retomar um rascunho)
 function markClient(errs) {
   document.querySelectorAll('#secClient [data-c]').forEach(el => { el.classList.remove('has-err'); el.querySelectorAll('.err').forEach(x => x.remove()); el.querySelectorAll('[aria-invalid]').forEach(x => { x.removeAttribute('aria-invalid'); x.removeAttribute('aria-describedby'); }); });
   if (!clientTouched) return;
@@ -5369,7 +5385,7 @@ function focusClient(k) {
 }
 // leva ao primeiro campo em falta: coordonnées, depois produto em edição, depois produto incompleto
 function gotoMissing() {
-  clientTouched = true; renderStatus();
+  tentou = true; clientTouched = true; renderStatus();
   const ce = clientErrors(readClient());
   if (ce.length) { focusClient(ce[0].k); return; }
   if (editing && editing.v.code) {
@@ -5395,7 +5411,7 @@ document.addEventListener('click', e => {
   if (e.target.closest('[data-savebtn]')) { e.preventDefault(); $('btnSave').click(); return; }
   if (e.target.closest('#pdfFloat')) { e.preventDefault(); $('secSend').scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
   const g = e.target.closest('[data-goto]'); if (g) { e.preventDefault(); if (g.closest('#errSide') && window.matchMedia && window.matchMedia('(max-width: 760px)').matches) { errSideOpen = false; $('errSide').classList.add('shut'); const tg = $('errSide').querySelector('.tg'); if (tg) tg.setAttribute('aria-expanded', 'false'); } focusField(g.dataset.goto); }
-  const gc = e.target.closest('[data-gotoc]'); if (gc) { e.preventDefault(); clientTouched = true; renderStatus(); focusClient(gc.dataset.gotoc); }
+  const gc = e.target.closest('[data-gotoc]'); if (gc) { e.preventDefault(); tentou = true; clientTouched = true; renderStatus(); focusClient(gc.dataset.gotoc); }
 });
 function deselRadio(rd) {
   if (/^c_/.test(rd.name)) { rd.checked = false; rd.dataset.was = ''; document.getElementById('secClient').dispatchEvent(new Event('change', { bubbles: true })); return true; }
@@ -5433,6 +5449,7 @@ function startEdit(index) {
   $('secEditor').scrollIntoView({ block: 'start' });
 }
 $('btnSave').onclick = () => {
+  tentou = true;
   editing.touched = true;
   const m = CAT[editing.v.code];
   if (!m) {   // 13/11/2026 (B12): sem modelo escolhido diz-se o que falta (antes não acontecia nada)
@@ -5561,6 +5578,7 @@ let preloadedCode = null;
 function famLabel(ps) { return [...new Set(ps.map(p => { const m = CAT[p.code] || {}; return m.ldg ? 'Garde-corps' : (m.hab || (m.pieces && p.v && p.v.pc_fiche === 'habitat')) ? 'Habitat' : 'Industriel'; }))]; }
 function b64ToBytes(b64) { const bin = atob(b64); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u; }
 async function generate(mat, btn) {
+  tentou = true;
   btn.disabled = true; btn.textContent = t('Génération…');
   try {
     const c = readClient();
@@ -5664,7 +5682,10 @@ function renderStatus() {
   if (ce.length) txt = tf('{n} information(s) manquante(s) dans vos coordonnées.', { n: ce.length }) + ' ' + txt;
   if (bad) txt += ' ' + tf('{n} produit(s) à compléter.', { n: bad });
   if (!ce.length && S.products.length && !bad && !editing) { cls = orange ? 'warn' : 'ok'; chip = t(orange ? 'Envoi possible – points à étudier' : '✓ Complet – prêt à envoyer'); txt = orange ? t('Certains points seront étudiés par Ferplay.') : tf('{n} produit(s) prêt(s).', { n: S.products.length }); }
+  if (cls === 'bad' && !tentou && !editing) { cls = 'info'; chip = t('À remplir'); txt = t('Commencez par vos coordonnées, puis ajoutez vos produits.'); }
   if (editing) txt = t('Produit en cours de modification.') + ' ' + txt;
+  { const done = [!ce.length, !!S.products.length && !bad && !editing, Object.keys(generated).length > 0]; const cur = done.indexOf(false);
+    document.querySelectorAll('#steps3 button').forEach((b, k) => { b.classList.toggle('done', done[k]); b.classList.toggle('cur', k === cur); if (k === cur) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current'); }); }
   $('chip').className = 'chip ' + cls; $('chip').textContent = chip; $('statusTxt').textContent = txt.trim();
   const editErr = editing && editing.v.code && validateProduct(CAT[editing.v.code], editing.v.f).errors.length;
   $('btnGoto').hidden = !(ce.length || bad || editErr || !S.products.length || (editing && !editing.v.code));
@@ -5711,6 +5732,7 @@ function exemple() {
 }
 $('btnExemple').onclick = exemple;
 $('btnGoto').onclick = gotoMissing;
+document.querySelectorAll('#steps3 [data-step]').forEach(b => b.onclick = () => { const el = document.getElementById(b.dataset.step); if (el) el.scrollIntoView({ block: 'start', behavior: 'smooth' }); });
 
 // ======================= verificação de fichas recebidas =======================
 const FIELD_NAMES = { 'L-LARGEUR': 'Largeur entre piliers (sans jeu) – L', 'H1-HAUTEUR': 'Hauteur des piliers (sous chapeaux) – H1', 'H2-HAUTEUR': 'H2 – hauteur au montant (hors gond)', 'H3-HAUTEUR': 'H3 – hauteur à la flèche', 'PORTAIL_MODÈLE': 'Modèle', FORME: 'Forme', RAL: 'Couleur RAL', 'RAL-BICOLOR': 'Deuxième couleur', MODELE: 'Modèle', QT: 'Quantité', HAUTER_A_LA_TRAVERSER_1: 'Hauteur', HAUTER_A_LA_TRAVERSER_2: 'Hauteur à la traverse', LARGEUR_RAVERSER_1: 'Largeur', COULEUR_RAL: 'Couleur RAL', MODELE_GRILLE: 'Modèle (grille)', HAUTER_GRILLE: 'Hauteur (grille)', 'Á_DROITE_LARGEUR': 'Largeur à droite (grille)', 'Á_GAUCHE_LARGEUR': 'Largeur à gauche (grille)', VENTOUSE_CLASSIC_QT: 'Ventouses (quantité)', VENTOUSE_LOCINOX_QT: 'Ventouses Locinox (quantité)', DEMANDE: 'Demande de prix / confirmation de commande', 'SUR CHANTIER': 'Livraison', PORTAIL_HAUTEUR: 'Hauteur (portail)', PORTAIL_LARGEUR: 'Largeur (portail)', '1_QT': 'Quantité (portail)', '1_PORTAIL_MODÈLE': 'Modèle (portail)', 'PORTAIL_SENS OUVERT': "Sens d'ouverture (portail)", '3_PORTILLON HAUTEUR': 'Hauteur (portillon)', '3_PORTILLON LARGEUR': 'Largeur (portillon)', '3_PORTILLON_QT': 'Quantité (portillon)', '3_PORTILLON_MODÈLE': 'Modèle (portillon)', '4_grille_HAUTEUR': 'Hauteur (clôture)', '4_grille_LARGEUR': 'Largeur (clôture)', '4_GRILLE_QT': 'Quantité (clôture)', '4_GRILLE_MODÈLE': 'Modèle (clôture)', '1_RAL': 'Couleur RAL', SOCIETE: 'Société', 'REF CLIENT': 'Référence', 'ADRESSE LIVRAISON': 'Adresse de livraison', EXPEDITEUR: 'Contact', 'Nº CMD': 'Nº CDE' };
@@ -5775,7 +5797,7 @@ if (INTERNE) {
 const draft = loadDraft();
 if (draft && ((draft.products && draft.products.length) || (draft.client && draft.client.societe))) {
   $('resumeBanner').hidden = false; draftPending = true;
-  $('btnResume').onclick = () => { draftPending = false; writeClient(draft.client || {}); S.products = (Array.isArray(draft.products) ? draft.products : []).map((p, i) => (p && CAT[p.code]) ? p : { ...(p || {}), nom: (draft.noms || [])[i] }); editing = draft.editing || null; $('resumeBanner').hidden = true; renderAll(); save(); S.products.forEach(preloadTpl); };
+  $('btnResume').onclick = () => { tentou = true; draftPending = false; writeClient(draft.client || {}); S.products = (Array.isArray(draft.products) ? draft.products : []).map((p, i) => (p && CAT[p.code]) ? p : { ...(p || {}), nom: (draft.noms || [])[i] }); editing = draft.editing || null; $('resumeBanner').hidden = true; renderAll(); save(); S.products.forEach(preloadTpl); };
   $('btnRestart').onclick = () => { draftPending = false; clearDraft(); $('resumeBanner').hidden = true; renderAll(); };
 }
 let lang0 = 'fr'; try { lang0 = localStorage.getItem('ferplay-lang') || 'fr'; } catch (e) { }
